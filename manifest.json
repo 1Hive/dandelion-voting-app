@@ -1,0 +1,9 @@
+{
+  "name": "Dissent voting",
+  "author": "1Hive",
+  "description": "Voting app with ACLOracle to approve/dissent actions",
+  "details_url": "/meta/details.md",
+  "source_url": "https://github.com/1Hive/dissent-voting-app.git",
+  "script": "/script.js",
+  "start_url": "/index.html"
+}

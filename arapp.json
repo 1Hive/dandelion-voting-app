@@ -1,0 +1,38 @@
+{
+  "environments": {
+    "default": {
+      "network": "development",
+      "appName": "dissent-voting.aragonpm.eth"
+    },
+    "rinkeby": {
+      "registry": "0x98df287b6c145399aaa709692c8d308357bc085d",
+      "appName": "dissent-voting.open.aragonpm.eth",
+      "wsRPC": "wss://rinkeby.eth.aragon.network/ws",
+      "network": "rinkeby"
+    },
+    "mainnet": {
+      "registry": "0x314159265dd8dbb310642f98f50c066173c1259b",
+      "appName": "dissent-voting.open.aragonpm.eth",
+      "wsRPC": "wss://mainnet.eth.aragon.network/ws",
+      "network": "mainnet"
+    }
+  },
+  "roles": [
+    {
+      "name": "Create new votes",
+      "id": "CREATE_VOTES_ROLE",
+      "params": []
+    },
+    {
+      "name": "Modify support",
+      "id": "MODIFY_SUPPORT_ROLE",
+      "params": ["New support", "Current support"]
+    },
+    {
+      "name": "Modify quorum",
+      "id": "MODIFY_QUORUM_ROLE",
+      "params": ["New quorum", "Current quorum"]
+    }
+  ],
+  "path": "contracts/DissentVoting.sol"
+}
