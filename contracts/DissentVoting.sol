@@ -63,8 +63,8 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
     uint256 public votesLength;
 
     //mapping to track most recent yes vote for a given address
-    mapping (address => uint64) internal lastYeaVote;
-    uint64 dissentWindow;
+    mapping (address => uint64) public lastYeaVoteTime;
+    uint64 public dissentWindow;
 
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
@@ -84,6 +84,7 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
     * @param _supportRequiredPct Percentage of yeas in casted votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
     * @param _minAcceptQuorumPct Percentage of yeas in total possible votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
     * @param _voteTime Seconds that a vote will be open for token holders to vote (unless enough yeas or nays have been cast to make an early decision)
+    * @param _dissentWindow Time window in seconds in which token holders can perform actions based on if their last yea vote was previous to (currentTime - window)
     */
     function initialize(
         MiniMeToken _token,
@@ -138,7 +139,7 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
 
     /**
     * @notice Change dissent window to  `_dissentWindow` seconds??
-    * @param _minAcceptQuorumPct New dissent window
+    * @param _dissentWindow New dissent window
     */
     function changeDissentWindow(uint64 _dissentWindow)
         external
@@ -184,7 +185,7 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
     * @param _executesIfDecided Whether the vote should execute its action if it becomes decided
     */
     function vote(uint256 _voteId, bool _supports, bool _executesIfDecided) external voteExists(_voteId) {
-        require(canVote(_voteId, msg.sender), ERROR_CAN_NOT_VOTE);
+        require(_canVote(_voteId, msg.sender), ERROR_CAN_NOT_VOTE);
         _vote(_voteId, _supports, msg.sender, _executesIfDecided);
     }
 
@@ -195,20 +196,26 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
     * @param _voteId Id for vote
     */
     function executeVote(uint256 _voteId) external voteExists(_voteId) {
-        require(canExecute(_voteId), ERROR_CAN_NOT_EXECUTE);
         _executeVote(_voteId);
     }
-
 
     /**
     * @notice ACLOracle that indicates if `who` can perform certain action based on most recent yes vote
     * @dev IACLOracle interface conformance
-    */    
+    */
     function canPerform(address who, address where, bytes32 what, uint256[] how) external view returns (bool) {
-        return lastYeaVote[who] < getTimestamp64().sub(dissentWindow);
+        uint64 window = (how.length > 0) ? uint64(how[0]) : dissentWindow;
+        return lastYeaVoteTime[who] < getTimestamp64().sub(window);
     }
 
-    function isForwarder() public pure returns (bool) {
+    // Forwarding fns
+
+    /**
+    * @notice Tells whether the Voting app is a forwarder or not
+    * @dev IForwarder interface conformance
+    * @return Always true
+    */
+    function isForwarder() external pure returns (bool) {
         return true;
     }
 
@@ -222,52 +229,53 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
         _newVote(_evmScript, "", true, true);
     }
 
+    /**
+    * @notice Tells whether `_sender` can forward actions or not
+    * @dev IForwarder interface conformance
+    * @param _sender Address of the account intending to forward an action
+    * @return True if the given address can create votes, false otherwise
+    */
     function canForward(address _sender, bytes) public view returns (bool) {
         // Note that `canPerform()` implicitly does an initialization check itself
         return canPerform(_sender, CREATE_VOTES_ROLE, arr());
     }
 
-    function canVote(uint256 _voteId, address _voter) public view voteExists(_voteId) returns (bool) {
-        Vote storage vote_ = votes[_voteId];
+    // Getter fns
 
-        //Check if voters stake hasn't changed since vote snapshot
-        // for more info see: https://github.com/1Hive/dissent-voting-app/issues/2#issuecomment-498684472
-        uint256 voterStake = token.balanceOfAt(_voter, vote_.snapshotBlock);
-        uint256 currentStake = token.balanceOf(_voter);
-
-        return _isVoteOpen(vote_) && !_hasVoted(vote_, _voter) && voterStake > 0 && voterStake == currentStake;
-    }
-
+    /**
+    * @notice Tells whether a vote #`_voteId` can be executed or not
+    * @dev Initialization check is implicitly provided by `voteExists()` as new votes can only be
+    *      created via `newVote(),` which requires initialization
+    * @return True if the given vote can be executed, false otherwise
+    */
     function canExecute(uint256 _voteId) public view voteExists(_voteId) returns (bool) {
-        Vote storage vote_ = votes[_voteId];
-
-        if (vote_.executed) {
-            return false;
-        }
-
-        // Voting is already decided
-        if (_isValuePct(vote_.yea, vote_.votingPower, vote_.supportRequiredPct)) {
-            return true;
-        }
-
-        uint256 totalVotes = vote_.yea.add(vote_.nay);
-
-        // Vote ended?
-        if (_isVoteOpen(vote_)) {
-            return false;
-        }
-        // Has enough support?
-        if (!_isValuePct(vote_.yea, totalVotes, vote_.supportRequiredPct)) {
-            return false;
-        }
-        // Has min quorum?
-        if (!_isValuePct(vote_.yea, vote_.votingPower, vote_.minAcceptQuorumPct)) {
-            return false;
-        }
-
-        return true;
+        return _canExecute(_voteId);
     }
 
+    /**
+    * @notice Tells whether `_sender` can participate in the vote #`_voteId` or not
+    * @dev Initialization check is implicitly provided by `voteExists()` as new votes can only be
+    *      created via `newVote(),` which requires initialization
+    * @return True if the given voter can participate a certain vote, false otherwise
+    */
+    function canVote(uint256 _voteId, address _voter) public view voteExists(_voteId) returns (bool) {
+        return _canVote(_voteId, _voter);
+    }
+
+    /**
+    * @dev Return all information for a vote by its ID
+    * @param _voteId Vote identifier
+    * @return Vote open status
+    * @return Vote executed status
+    * @return Vote start date
+    * @return Vote snapshot block
+    * @return Vote support required
+    * @return Vote minimum acceptance quorum
+    * @return Vote yeas amount
+    * @return Vote nays amount
+    * @return Vote power
+    * @return Vote script
+    */
     function getVote(uint256 _voteId)
         public
         view
@@ -299,21 +307,31 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
         script = vote_.executionScript;
     }
 
+    /**
+    * @dev Return the state of a voter for a given vote by its ID
+    * @param _voteId Vote identifier
+    * @return VoterState of the requested voter for a certain vote
+    */
     function getVoterState(uint256 _voteId, address _voter) public view voteExists(_voteId) returns (VoterState) {
         return votes[_voteId].voters[_voter];
     }
 
-    function _newVote(bytes _executionScript, string _metadata, bool _castVote, bool _executesIfDecided)
-        internal
-        returns (uint256 voteId)
-    {
-        uint256 votingPower = token.totalSupplyAt(vote_.snapshotBlock);
+    // Internal fns
+
+    /**
+    * @dev Internal function to create a new vote
+    * @return voteId id for newly created vote
+    */
+    function _newVote(bytes _executionScript, string _metadata, bool _castVote, bool _executesIfDecided) internal returns (uint256 voteId) {
+        uint64 snapshotBlock = getBlockNumber64() - 1; // avoid double voting in this very block
+        uint256 votingPower = token.totalSupplyAt(snapshotBlock);
         require(votingPower > 0, ERROR_NO_VOTING_POWER);
 
         voteId = votesLength++;
+
         Vote storage vote_ = votes[voteId];
         vote_.startDate = getTimestamp64();
-        vote_.snapshotBlock = getBlockNumber64() - 1; // avoid double voting in this very block
+        vote_.snapshotBlock = snapshotBlock;
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
         vote_.votingPower = votingPower;
@@ -321,11 +339,14 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
 
         emit StartVote(voteId, msg.sender, _metadata);
 
-        if (_castVote && canVote(voteId, msg.sender)) {
+        if (_castVote && _canVote(voteId, msg.sender)) {
             _vote(voteId, true, msg.sender, _executesIfDecided);
         }
     }
 
+    /**
+    * @dev Internal function to cast a vote. It assumes the queried vote exists.
+    */
     function _vote(
         uint256 _voteId,
         bool _supports,
@@ -338,10 +359,10 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
         // This could re-enter, though we can assume the governance token is not malicious
         uint256 voterStake = token.balanceOfAt(_voter, vote_.snapshotBlock);
 
-        //don't have to decrease voterStake as the original voting-app as canExecute() checks if _voter has already voted
+        //Removed resetting of vote stake, that was in the original voting-app, as voters can only vote once.
         if (_supports) {
             vote_.yea = vote_.yea.add(voterStake);
-            lastYeaVote[_voter] = getTimestamp64();
+            lastYeaVoteTime[_voter] = getTimestamp64();
         } else {
             vote_.nay = vote_.nay.add(voterStake);
         }
@@ -350,12 +371,24 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
 
         emit CastVote(_voteId, _voter, _supports, voterStake);
 
-        if (_executesIfDecided && canExecute(_voteId)) {
-            _executeVote(_voteId);
+        if (_executesIfDecided && _canExecute(_voteId)) {
+            // We've already checked if the vote can be executed with `_canExecute()`
+            _unsafeExecuteVote(_voteId);
         }
     }
 
+    /**
+    * @dev Internal function to execute a vote. It assumes the queried vote exists.
+    */
     function _executeVote(uint256 _voteId) internal {
+        require(_canExecute(_voteId), ERROR_CAN_NOT_EXECUTE);
+        _unsafeExecuteVote(_voteId);
+    }
+
+    /**
+    * @dev Unsafe version of _executeVote that assumes you have already checked if the vote can be executed and exists
+    */
+    function _unsafeExecuteVote(uint256 _voteId) internal {
         Vote storage vote_ = votes[_voteId];
 
         vote_.executed = true;
@@ -366,10 +399,65 @@ contract DissentVoting is IACLOracle, IForwarder, AragonApp {
         emit ExecuteVote(_voteId);
     }
 
+    /**
+    * @dev Internal function to check if a vote can be executed. It assumes the queried vote exists.
+    * @return True if the given vote can be executed, false otherwise
+    */
+    function _canExecute(uint256 _voteId) internal view returns (bool) {
+        Vote storage vote_ = votes[_voteId];
+
+        if (vote_.executed) {
+            return false;
+        }
+
+        // Voting is already decided
+        if (_isValuePct(vote_.yea, vote_.votingPower, vote_.supportRequiredPct)) {
+            return true;
+        }
+
+        // Vote ended?
+        if (_isVoteOpen(vote_)) {
+            return false;
+        }
+        // Has enough support?
+        uint256 totalVotes = vote_.yea.add(vote_.nay);
+        if (!_isValuePct(vote_.yea, totalVotes, vote_.supportRequiredPct)) {
+            return false;
+        }
+        // Has min quorum?
+        if (!_isValuePct(vote_.yea, vote_.votingPower, vote_.minAcceptQuorumPct)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+    * @dev Internal function to check if a voter can participate on a vote. It assumes the queried vote exists.
+    * @return True if the given voter can participate a certain vote, false otherwise
+    */
+    function _canVote(uint256 _voteId, address _voter) internal view returns (bool) {
+        Vote storage vote_ = votes[_voteId];
+        //Check if voters stake hasn't changed since vote snapshot
+        // for more info see: https://github.com/1Hive/dissent-voting-app/issues/2#issuecomment-498684472
+        uint256 voterStake = token.balanceOfAt(_voter, vote_.snapshotBlock);
+        uint256 currentStake = token.balanceOf(_voter);
+
+        return _isVoteOpen(vote_) && !_hasVoted(vote_, _voter) && voterStake > 0 && voterStake == currentStake;
+    }
+
+    /**
+    * @dev Internal function to check if a vote is still open
+    * @return True if the given vote is open, false otherwise
+    */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
         return getTimestamp64() < vote_.startDate.add(voteTime) && !vote_.executed;
     }
 
+    /**
+    * @dev Internal function to check if a voter has already voted
+    * @return True if the given voter has voted, false otherwise
+    */
     function _hasVoted(Vote storage vote_, address _voter) internal view returns (bool) {
         return vote_.voters[_voter] != VoterState.Absent;
     }
