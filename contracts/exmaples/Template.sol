@@ -99,8 +99,8 @@ contract Template is TemplateBase {
 
         acl.createPermission(tokenManager, dissent, dissent.CREATE_VOTES_ROLE(), root);
 
-        // creating param for dissent oracle (the idea here is when an entity tries to transfer tokens, it first checks with the oracle)
-        setOracle(acl, ANY_ENTITY, tokenManager, tokenManager.BURN_ROLE(), dissent);
+        // creating param for dissent oracle (the idea here is when an entity tries to mint tokens, it first checks with the oracle)
+        setOracle(acl, ANY_ENTITY, tokenManager, tokenManager.MINT_ROLE(), dissent);
 
         // Clean up permissions
         acl.grantPermission(root, dao, dao.APP_MANAGER_ROLE());
