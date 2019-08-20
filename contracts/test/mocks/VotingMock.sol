@@ -1,6 +1,6 @@
 pragma solidity 0.4.24;
 
-import "../../Voting.sol";
+import "../../DissentVoting.sol";
 import "@aragon/test-helpers/contracts/TimeHelpersMock.sol";
 
 

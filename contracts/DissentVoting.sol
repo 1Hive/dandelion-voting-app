@@ -13,7 +13,7 @@ import "@aragon/os/contracts/lib/math/SafeMath64.sol";
 import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 
 
-contract Voting is IForwarder, AragonApp {
+contract DissentVoting is IForwarder, AragonApp {
     using SafeMath for uint256;
     using SafeMath64 for uint64;
 
@@ -57,6 +57,7 @@ contract Voting is IForwarder, AragonApp {
     // We are mimicing an array, we use a mapping instead to make app upgrade more graceful
     mapping (uint256 => Vote) internal votes;
     uint256 public votesLength;
+    mapping (address => uint64) public lastYeaVoteTime;
 
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
@@ -310,17 +311,10 @@ contract Voting is IForwarder, AragonApp {
 
         // This could re-enter, though we can assume the governance token is not malicious
         uint256 voterStake = token.balanceOfAt(_voter, vote_.snapshotBlock);
-        VoterState state = vote_.voters[_voter];
-
-        // If voter had previously voted, decrease count
-        if (state == VoterState.Yea) {
-            vote_.yea = vote_.yea.sub(voterStake);
-        } else if (state == VoterState.Nay) {
-            vote_.nay = vote_.nay.sub(voterStake);
-        }
 
         if (_supports) {
             vote_.yea = vote_.yea.add(voterStake);
+            lastYeaVoteTime[_voter] = lastYeaVoteTime[_voter] < vote_.startDate ? vote_.startDate : lastYeaVoteTime[_voter];
         } else {
             vote_.nay = vote_.nay.add(voterStake);
         }
@@ -396,7 +390,7 @@ contract Voting is IForwarder, AragonApp {
     */
     function _canVote(uint256 _voteId, address _voter) internal view returns (bool) {
         Vote storage vote_ = votes[_voteId];
-        return _isVoteOpen(vote_) && token.balanceOfAt(_voter, vote_.snapshotBlock) > 0;
+        return _isVoteOpen(vote_) && token.balanceOfAt(_voter, vote_.snapshotBlock) > 0 && _hasNotVoted(vote_, _voter);
     }
 
     /**
@@ -405,6 +399,14 @@ contract Voting is IForwarder, AragonApp {
     */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
         return getTimestamp64() < vote_.startDate.add(voteTime) && !vote_.executed;
+    }
+
+    /**
+    * @dev Internal function to check if a voter has already voted
+    * @return True if the given voter has voted, false otherwise
+    */
+    function _hasNotVoted(Vote storage vote_, address _voter) internal view returns (bool) {
+        return vote_.voters[_voter] == VoterState.Absent;
     }
 
     /**

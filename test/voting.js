@@ -273,16 +273,6 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     assert.equal(voterState, VOTER_STATE.NAY, 'holder29 should have nay voter status')
                 })
 
-                it('holder can modify vote', async () => {
-                    await voting.vote(voteId, true, true, { from: holder29 })
-                    await voting.vote(voteId, false, true, { from: holder29 })
-                    await voting.vote(voteId, true, true, { from: holder29 })
-                    const state = await voting.getVote(voteId)
-
-                    assert.equal(state[6].toString(), bigExp(29, decimals).toString(), 'yea vote should have been counted')
-                    assert.equal(state[7], 0, 'nay vote should have been removed')
-                })
-
                 it('token transfers dont affect voting', async () => {
                     await token.transfer(nonHolder, bigExp(29, decimals), { from: holder29 })
 
@@ -342,6 +332,55 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 it('cannot vote on executed vote', async () => {
                     await voting.vote(voteId, true, true, { from: holder51 }) // causes execution
                     await assertRevert(voting.vote(voteId, true, true, { from: holder20 }), errors.VOTING_CAN_NOT_VOTE)
+                })
+
+                // TODO: NEW/MODIFIED TESTS TO END OF DESCRIBE, COMMENT PURPOSE TO HIGHLIGHT, REMOVE COMMENT WHEN FINALISED
+                it("holder can't modify vote", async () => {
+                    await voting.vote(voteId, true, true, { from: holder29 })
+                    await assertRevert(voting.vote(voteId, false, true, { from: holder29 }), errors.VOTING_CAN_NOT_VOTE)
+                })
+
+                it("last yea vote time for voter set to start time of vote voted for", async () => {
+                    const [_isOpen, _isExecuted, startDate] = await voting.getVote(voteId)
+
+                    await voting.vote(voteId, true, true, { from: holder29 })
+
+                    const actualLastYeaTime = await voting.lastYeaVoteTime(holder29)
+                    assert.equal(actualLastYeaTime.toString(), startDate.toString())
+                })
+
+                describe("last yea vote on second vote", () => {
+
+                    let secondVoteId, secondVoteStartDate
+
+                    beforeEach(async () => {
+                        await voting.mockIncreaseTime(120)
+                        const receipt = await voting.newVoteExt(script, 'metadata', false, false, { from: holder20 });
+                        secondVoteId = getEventArgument(receipt, 'StartVote', 'voteId')
+                        secondVoteStartDate = (await voting.getVote(secondVoteId))[2]
+                    })
+
+                    it("updates when voting on a second vote", async () => {
+                        await voting.vote(voteId, true, true, { from: holder29 })
+                        const [_isOpen, _isExecuted, firstVoteStartDate] = await voting.getVote(voteId)
+
+                        await voting.vote(secondVoteId, true, true, { from: holder29 })
+
+                        const actualLastYeaTime = await voting.lastYeaVoteTime(holder29)
+                        assert.equal(actualLastYeaTime.toString(), secondVoteStartDate.toString())
+                        assert.notEqual(actualLastYeaTime.toString(), firstVoteStartDate.toString())
+                    })
+
+                    it("doesn't update when second vote start time before voted on vote start time", async () => {
+                        await voting.vote(secondVoteId, true, true, { from: holder29 })
+                        const [_isOpen, _isExecuted, firstVoteStartDate] = await voting.getVote(voteId)
+
+                        await voting.vote(voteId, true, true, { from: holder29 })
+
+                        const actualLastYeaTime = await voting.lastYeaVoteTime(holder29)
+                        assert.equal(actualLastYeaTime.toString(), secondVoteStartDate.toString())
+                        assert.notEqual(actualLastYeaTime.toString(), firstVoteStartDate.toString())
+                    })
                 })
             })
         })
