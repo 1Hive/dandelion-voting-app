@@ -4,7 +4,7 @@ import "../../DissentVoting.sol";
 import "@aragon/test-helpers/contracts/TimeHelpersMock.sol";
 
 
-contract VotingMock is Voting, TimeHelpersMock {
+contract VotingMock is DissentVoting, TimeHelpersMock {
     /* Ugly hack to work around this issue:
      * https://github.com/trufflesuite/truffle/issues/569
      * https://github.com/trufflesuite/truffle/issues/737

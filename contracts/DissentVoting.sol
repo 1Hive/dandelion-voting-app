@@ -403,7 +403,7 @@ contract DissentVoting is IForwarder, AragonApp {
 
     /**
     * @dev Internal function to check if a voter has already voted
-    * @return True if the given voter has voted, false otherwise
+    * @return True if the given voter has not voted, false if they have voted
     */
     function _hasNotVoted(Vote storage vote_, address _voter) internal view returns (bool) {
         return vote_.voters[_voter] == VoterState.Absent;
