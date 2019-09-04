@@ -122,26 +122,15 @@ contract DissentVoting is IForwarder, AragonApp {
     * @notice Create a new vote about "`_metadata`"
     * @param _executionScript EVM script to be executed on approval
     * @param _metadata Vote metadata
-    * @return voteId Id for newly created vote
-    */
-    function newVote(bytes _executionScript, string _metadata) external auth(CREATE_VOTES_ROLE) returns (uint256 voteId) {
-        return _newVote(_executionScript, _metadata, true, true);
-    }
-
-    /**
-    * @notice Create a new vote about "`_metadata`"
-    * @param _executionScript EVM script to be executed on approval
-    * @param _metadata Vote metadata
     * @param _castVote Whether to also cast newly created vote
-    * @param _executesIfDecided Whether to also immediately execute newly created vote if decided
     * @return voteId id for newly created vote
     */
-    function newVote(bytes _executionScript, string _metadata, bool _castVote, bool _executesIfDecided)
+    function newVote(bytes _executionScript, string _metadata, bool _castVote)
         external
         auth(CREATE_VOTES_ROLE)
         returns (uint256 voteId)
     {
-        return _newVote(_executionScript, _metadata, _castVote, _executesIfDecided);
+        return _newVote(_executionScript, _metadata, _castVote);
     }
 
     /**
@@ -150,11 +139,10 @@ contract DissentVoting is IForwarder, AragonApp {
     *      created via `newVote(),` which requires initialization
     * @param _voteId Id for vote
     * @param _supports Whether voter supports the vote
-    * @param _executesIfDecided Whether the vote should execute its action if it becomes decided
     */
-    function vote(uint256 _voteId, bool _supports, bool _executesIfDecided) external voteExists(_voteId) {
+    function vote(uint256 _voteId, bool _supports) external voteExists(_voteId) {
         require(_canVote(_voteId, msg.sender), ERROR_CAN_NOT_VOTE);
-        _vote(_voteId, _supports, msg.sender, _executesIfDecided);
+        _vote(_voteId, _supports, msg.sender);
     }
 
     /**
@@ -185,7 +173,7 @@ contract DissentVoting is IForwarder, AragonApp {
     */
     function forward(bytes _evmScript) public {
         require(canForward(msg.sender, _evmScript), ERROR_CAN_NOT_FORWARD);
-        _newVote(_evmScript, "", true, true);
+        _newVote(_evmScript, "", true);
     }
 
     /**
@@ -281,7 +269,7 @@ contract DissentVoting is IForwarder, AragonApp {
     * @dev Internal function to create a new vote
     * @return voteId id for newly created vote
     */
-    function _newVote(bytes _executionScript, string _metadata, bool _castVote, bool _executesIfDecided) internal returns (uint256 voteId) {
+    function _newVote(bytes _executionScript, string _metadata, bool _castVote) internal returns (uint256 voteId) {
         uint64 snapshotBlock = getBlockNumber64() - 1; // avoid double voting in this very block
         uint256 votingPower = token.totalSupplyAt(snapshotBlock);
         require(votingPower > 0, ERROR_NO_VOTING_POWER);
@@ -299,14 +287,14 @@ contract DissentVoting is IForwarder, AragonApp {
         emit StartVote(voteId, msg.sender, _metadata);
 
         if (_castVote && _canVote(voteId, msg.sender)) {
-            _vote(voteId, true, msg.sender, _executesIfDecided);
+            _vote(voteId, true, msg.sender);
         }
     }
 
     /**
     * @dev Internal function to cast a vote. It assumes the queried vote exists.
     */
-    function _vote(uint256 _voteId, bool _supports, address _voter, bool _executesIfDecided) internal {
+    function _vote(uint256 _voteId, bool _supports, address _voter) internal {
         Vote storage vote_ = votes[_voteId];
 
         // This could re-enter, though we can assume the governance token is not malicious
@@ -322,11 +310,6 @@ contract DissentVoting is IForwarder, AragonApp {
         vote_.voters[_voter] = _supports ? VoterState.Yea : VoterState.Nay;
 
         emit CastVote(_voteId, _voter, _supports, voterStake);
-
-        if (_executesIfDecided && _canExecute(_voteId)) {
-            // We've already checked if the vote can be executed with `_canExecute()`
-            _unsafeExecuteVote(_voteId);
-        }
     }
 
     /**
@@ -358,6 +341,11 @@ contract DissentVoting is IForwarder, AragonApp {
     function _canExecute(uint256 _voteId) internal view returns (bool) {
         Vote storage vote_ = votes[_voteId];
 
+        // Vote ended?
+        if (_isVoteOpen(vote_)) {
+            return false;
+        }
+
         if (vote_.executed) {
             return false;
         }
@@ -367,10 +355,6 @@ contract DissentVoting is IForwarder, AragonApp {
             return true;
         }
 
-        // Vote ended?
-        if (_isVoteOpen(vote_)) {
-            return false;
-        }
         // Has enough support?
         uint256 totalVotes = vote_.yea.add(vote_.nay);
         if (!_isValuePct(vote_.yea, totalVotes, vote_.supportRequiredPct)) {
@@ -398,7 +382,7 @@ contract DissentVoting is IForwarder, AragonApp {
     * @return True if the given vote is open, false otherwise
     */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
-        return getTimestamp64() < vote_.startDate.add(voteTime) && !vote_.executed;
+        return getTimestamp64() >= vote_.startDate && getTimestamp64() < vote_.startDate.add(voteTime);
     }
 
     /**
