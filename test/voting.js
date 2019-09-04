@@ -31,7 +31,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
     let votingBase, daoFact, voting, token, executionTarget
 
     let APP_MANAGER_ROLE
-    let CREATE_VOTES_ROLE, MODIFY_SUPPORT_ROLE, MODIFY_QUORUM_ROLE
+    let CREATE_VOTES_ROLE, MODIFY_SUPPORT_ROLE, MODIFY_QUORUM_ROLE, MODIFY_STAGGER_TIME_ROLE
 
     // Error strings
     const errors = makeErrorMappingProxy({
@@ -55,6 +55,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
     })
 
     const NOW = 1
+    const staggerTime = 100
     const votingDuration = 1000
 
     before(async () => {
@@ -69,6 +70,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         CREATE_VOTES_ROLE = await votingBase.CREATE_VOTES_ROLE()
         MODIFY_SUPPORT_ROLE = await votingBase.MODIFY_SUPPORT_ROLE()
         MODIFY_QUORUM_ROLE = await votingBase.MODIFY_QUORUM_ROLE()
+        MODIFY_STAGGER_TIME_ROLE = await votingBase.MODIFY_STAGGER_TIME_ROLE()
     })
 
     beforeEach(async () => {
@@ -85,6 +87,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         await acl.createPermission(ANY_ADDR, voting.address, CREATE_VOTES_ROLE, root, { from: root })
         await acl.createPermission(ANY_ADDR, voting.address, MODIFY_SUPPORT_ROLE, root, { from: root })
         await acl.createPermission(ANY_ADDR, voting.address, MODIFY_QUORUM_ROLE, root, { from: root })
+        await acl.createPermission(ANY_ADDR, voting.address, MODIFY_STAGGER_TIME_ROLE, root, { from: root })
     })
 
     context('normal token supply, common tests', () => {
@@ -94,19 +97,19 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         beforeEach(async () => {
             token = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'n', 0, 'n', true) // empty parameters minime
 
-            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration)
+            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration, staggerTime)
 
             executionTarget = await ExecutionTarget.new()
         })
 
         it('fails on reinitialization', async () => {
-            await assertRevert(voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration), errors.INIT_ALREADY_INITIALIZED)
+            await assertRevert(voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration, staggerTime), errors.INIT_ALREADY_INITIALIZED)
         })
 
         it('cannot initialize base app', async () => {
             const newVoting = await Voting.new()
             assert.isTrue(await newVoting.isPetrified())
-            await assertRevert(newVoting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration), errors.INIT_ALREADY_INITIALIZED)
+            await assertRevert(newVoting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration, staggerTime), errors.INIT_ALREADY_INITIALIZED)
         })
 
         it('checks it is forwarder', async () => {
@@ -140,6 +143,14 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             await assertRevert(voting.changeMinAcceptQuorumPct(neededSupport.plus(1)), errors.VOTING_CHANGE_QUORUM_PCTS)
         })
 
+        it('can change stagger time', async () => {
+            const expectedStaggerTime = 30
+            const receipt = await voting.changeStaggerTime(30)
+            assertAmountOfEvents(receipt, 'ChangeStaggerTime')
+
+            assert.equal(await voting.staggerTime(), expectedStaggerTime, 'should have changed stagger time')
+        })
+
     })
 
     // for (const decimals of [0]) {
@@ -155,7 +166,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 await token.generateTokens(holder29, bigExp(29, decimals))
                 await token.generateTokens(holder51, bigExp(51, decimals))
 
-                await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration)
+                await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration, staggerTime)
 
                 executionTarget = await ExecutionTarget.new()
             })
@@ -207,6 +218,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
                     assert.isTrue(isOpen, 'vote should be open')
                     assert.isFalse(isExecuted, 'vote should not be executed')
+                    assert.equal(startDate.toString(), NOW)
                     assert.equal(creator, holder51, 'creator should be correct')
                     assert.equal(snapshotBlock.toString(), await getBlockNumber() - 1, 'snapshot block should be correct')
                     assert.equal(supportRequired.toString(), neededSupport.toString(), 'required support should be app required support')
@@ -283,7 +295,15 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     await assertRevert(voting.vote(voteId, true, { from: holder29 }), errors.VOTING_CAN_NOT_VOTE)
                 })
 
-                // TODO: it('throws when voting before voting opens')
+                it("throws when voting before start time", async () => {
+                    const newVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder51 }));
+                    const [_newVoteOpen, _newVoteExecuted, newVoteStartDate] = await voting.getVote(newVoteId)
+                    const currentTime = await voting.getTimestampPublic()
+
+                    assert(parseInt(newVoteStartDate) > parseInt(currentTime), "new vote start time should be ahead of current time")
+
+                    await assertRevert(voting.vote(newVoteId, true, { from: holder29 }), errors.VOTING_CAN_NOT_VOTE)
+                })
 
                 it('can execute if vote is approved with support and quorum', async () => {
                     await voting.vote(voteId, true, { from: holder29 })
@@ -306,7 +326,6 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     await assertRevert(voting.executeVote(voteId), errors.VOTING_CAN_NOT_EXECUTE)
                 })
 
-                // TODO: Modify with start time.
                 it('cannot execute vote before vote has ended', async () => {
                     await voting.vote(voteId, true, { from: holder29 })
                     await voting.vote(voteId, false, { from: holder20 })
@@ -323,7 +342,46 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     await assertRevert(voting.executeVote(voteId), errors.VOTING_CAN_NOT_EXECUTE)
                 })
 
-                // TODO: NEW/MODIFIED TESTS TO END OF DESCRIBE, COMMENT PURPOSE TO HIGHLIGHT, REMOVE COMMENT WHEN FINALISED
+                it('cannot execute unvoted vote before start time', async () => {
+                    const newVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder51 }));
+                    const [_newVoteOpen, _newVoteExecuted, newVoteStartDate] = await voting.getVote(newVoteId)
+                    const currentTime = await voting.getTimestampPublic()
+
+                    assert(parseInt(newVoteStartDate) > parseInt(currentTime), "new vote start time should be ahead of current time")
+                    await assertRevert(voting.executeVote(newVoteId), errors.VOTING_CAN_NOT_EXECUTE)
+                })
+
+                it("sets second vote start time correctly when vote created before stagger time elapsed", async () => {
+                    const [_currentVoteOpen, _currentVoteExecuted, currentVoteStartDate] = await voting.getVote(voteId)
+                    const expectedVoteStartDate = parseInt(currentVoteStartDate) + staggerTime
+
+                    const newVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder51 }));
+
+                    const [_newVoteOpen, _newVoteExecuted, newVoteStartDate] = await voting.getVote(newVoteId)
+                    assert.equal(newVoteStartDate, expectedVoteStartDate)
+                })
+
+                it("sets third vote start time correctly when all created within stagger time", async () => {
+                    const secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder51 }));
+                    const [_currentVoteOpen, _currentVoteExecuted, secondVoteStartDate] = await voting.getVote(secondVoteId)
+                    const expectedVoteStartDate = parseInt(secondVoteStartDate) + staggerTime
+
+                    const thirdVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder51 }));
+
+                    const [_thirdVoteOpen, _thirdVoteExecuted, thirdVoteStartDate] = await voting.getVote(thirdVoteId)
+                    assert.equal(thirdVoteStartDate, expectedVoteStartDate)
+                })
+
+                it("sets second vote start time correctly when vote created after stagger time elapsed", async () => {
+                    const expectedVoteStartDate = NOW + staggerTime + 5
+                    await voting.mockSetTimestamp(expectedVoteStartDate)
+
+                    const newVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder51 }));
+
+                    const [_newVoteOpen, _newVoteExecuted, newVoteStartDate] = await voting.getVote(newVoteId)
+                    assert.equal(newVoteStartDate, expectedVoteStartDate)
+                })
+
                 it("holder can't modify vote", async () => {
                     await voting.vote(voteId, true, { from: holder29 })
                     await assertRevert(voting.vote(voteId, false, { from: holder29 }), errors.VOTING_CAN_NOT_VOTE)
@@ -383,13 +441,13 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         it('fails if min acceptance quorum is greater than min support', async () => {
             const neededSupport = pct16(20)
             const minimumAcceptanceQuorum = pct16(50)
-            await assertRevert(voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration), errors.VOTING_INIT_PCTS)
+            await assertRevert(voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration, staggerTime), errors.VOTING_INIT_PCTS)
         })
 
         it('fails if min support is 100% or more', async () => {
             const minimumAcceptanceQuorum = pct16(20)
-            await assertRevert(voting.initialize(token.address, pct16(101), minimumAcceptanceQuorum, votingDuration), errors.VOTING_INIT_SUPPORT_TOO_BIG)
-            await assertRevert(voting.initialize(token.address, pct16(100), minimumAcceptanceQuorum, votingDuration), errors.VOTING_INIT_SUPPORT_TOO_BIG)
+            await assertRevert(voting.initialize(token.address, pct16(101), minimumAcceptanceQuorum, votingDuration, staggerTime), errors.VOTING_INIT_SUPPORT_TOO_BIG)
+            await assertRevert(voting.initialize(token.address, pct16(100), minimumAcceptanceQuorum, votingDuration, staggerTime), errors.VOTING_INIT_SUPPORT_TOO_BIG)
         })
     })
 
@@ -400,7 +458,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         beforeEach(async() => {
             token = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'n', 0, 'n', true) // empty parameters minime
 
-            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration)
+            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration, staggerTime)
         })
 
         it('fails creating a vote if token has no holder', async () => {
@@ -408,7 +466,6 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         })
     })
 
-    // TODO: Delete the bottom 2 context's worth of tests?
     context('token supply = 1', () => {
         const neededSupport = pct16(50)
         const minimumAcceptanceQuorum = pct16(20)
@@ -418,7 +475,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
             await token.generateTokens(holder1, 1)
 
-            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration)
+            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration, staggerTime)
         })
 
         it('new vote cannot be executed after only possible voter has voted', async () => {
@@ -446,7 +503,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             await token.generateTokens(holder1, 1)
             await token.generateTokens(holder2, 2)
 
-            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration)
+            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration, staggerTime)
         })
 
         it('new vote cannot be executed before holder2 voting', async () => {
@@ -482,7 +539,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             await token.generateTokens(holder1, 1)
             await token.generateTokens(holder2, 1)
 
-            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration)
+            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, votingDuration, staggerTime)
         })
 
         it('uses the correct snapshot value if tokens are minted afterwards', async () => {

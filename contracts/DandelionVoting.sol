@@ -13,13 +13,14 @@ import "@aragon/os/contracts/lib/math/SafeMath64.sol";
 import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 
 
-contract DissentVoting is IForwarder, AragonApp {
+contract DandelionVoting is IForwarder, AragonApp {
     using SafeMath for uint256;
     using SafeMath64 for uint64;
 
     bytes32 public constant CREATE_VOTES_ROLE = keccak256("CREATE_VOTES_ROLE");
     bytes32 public constant MODIFY_SUPPORT_ROLE = keccak256("MODIFY_SUPPORT_ROLE");
     bytes32 public constant MODIFY_QUORUM_ROLE = keccak256("MODIFY_QUORUM_ROLE");
+    bytes32 public constant MODIFY_STAGGER_TIME_ROLE = keccak256("MODIFY_STAGGER_TIME_ROLE");
 
     uint64 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10^16; 100% = 10^18
 
@@ -53,6 +54,7 @@ contract DissentVoting is IForwarder, AragonApp {
     uint64 public supportRequiredPct;
     uint64 public minAcceptQuorumPct;
     uint64 public voteTime;
+    uint64 public staggerTime;
 
     // We are mimicing an array, we use a mapping instead to make app upgrade more graceful
     mapping (uint256 => Vote) internal votes;
@@ -64,6 +66,7 @@ contract DissentVoting is IForwarder, AragonApp {
     event ExecuteVote(uint256 indexed voteId);
     event ChangeSupportRequired(uint64 supportRequiredPct);
     event ChangeMinQuorum(uint64 minAcceptQuorumPct);
+    event ChangeStaggerTime(uint64 staggerTime);
 
     modifier voteExists(uint256 _voteId) {
         require(_voteId < votesLength, ERROR_NO_VOTE);
@@ -76,8 +79,12 @@ contract DissentVoting is IForwarder, AragonApp {
     * @param _supportRequiredPct Percentage of yeas in casted votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
     * @param _minAcceptQuorumPct Percentage of yeas in total possible votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
     * @param _voteTime Seconds that a vote will be open for token holders to vote (unless enough yeas or nays have been cast to make an early decision)
+    * @param _staggerTime Minimum number of seconds between the start time of each vote
     */
-    function initialize(MiniMeToken _token, uint64 _supportRequiredPct, uint64 _minAcceptQuorumPct, uint64 _voteTime) external onlyInit {
+    function initialize(MiniMeToken _token, uint64 _supportRequiredPct, uint64 _minAcceptQuorumPct, uint64 _voteTime, uint64 _staggerTime)
+        external
+        onlyInit
+    {
         initialized();
 
         require(_minAcceptQuorumPct <= _supportRequiredPct, ERROR_INIT_PCTS);
@@ -87,6 +94,7 @@ contract DissentVoting is IForwarder, AragonApp {
         supportRequiredPct = _supportRequiredPct;
         minAcceptQuorumPct = _minAcceptQuorumPct;
         voteTime = _voteTime;
+        staggerTime = _staggerTime;
     }
 
     /**
@@ -116,6 +124,16 @@ contract DissentVoting is IForwarder, AragonApp {
         minAcceptQuorumPct = _minAcceptQuorumPct;
 
         emit ChangeMinQuorum(_minAcceptQuorumPct);
+    }
+
+    /**
+    * @notice Change stagger period to `@transformTime(_staggerTime)`
+    * @param _staggerTime New stagger time
+    */
+    function changeStaggerTime(uint64 _staggerTime) external auth(MODIFY_STAGGER_TIME_ROLE) {
+        staggerTime = _staggerTime;
+
+        emit ChangeStaggerTime(_staggerTime);
     }
 
     /**
@@ -276,8 +294,11 @@ contract DissentVoting is IForwarder, AragonApp {
 
         voteId = votesLength++;
 
+        uint64 previousVoteStartDate = voteId == 0 ? 0 : votes[voteId.sub(1)].startDate;
+        uint64 earliestStartDate = previousVoteStartDate == 0 ? 0 : previousVoteStartDate.add(staggerTime);
+
         Vote storage vote_ = votes[voteId];
-        vote_.startDate = getTimestamp64();
+        vote_.startDate = earliestStartDate < getTimestamp64() ? getTimestamp64() : earliestStartDate;
         vote_.snapshotBlock = snapshotBlock;
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
