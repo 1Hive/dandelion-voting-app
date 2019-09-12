@@ -362,7 +362,6 @@ contract DandelionVoting is IForwarder, AragonApp {
     function _canExecute(uint256 _voteId) internal view returns (bool) {
         Vote storage vote_ = votes[_voteId];
 
-        // Vote ended?
         if (_isVoteOpen(vote_)) {
             return false;
         }

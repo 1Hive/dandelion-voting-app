@@ -153,6 +153,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
     })
 
+    // TODO: DELETE THIS!
     // for (const decimals of [0]) {
     for (const decimals of [0, 2, 18, 26]) {
         context(`normal token supply, ${decimals} decimals`, () => {
