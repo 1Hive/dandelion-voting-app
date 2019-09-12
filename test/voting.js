@@ -189,7 +189,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 let script = encodeCallScript([action])
                 script = script.slice(0, -2) // remove one byte from calldata for it to fail
                 const voteId = createdVoteId(await voting.newVote(script, '', true, { from: holder51 }))
-                await voting.mockIncreaseTime(votingDuration)
+                await voting.mockIncreaseTime(votingDuration + 1)
                 await assertRevert(voting.executeVote(voteId))
             })
 
@@ -332,14 +332,21 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     await assertRevert(voting.executeVote(voteId), errors.VOTING_CAN_NOT_EXECUTE)
                 })
 
-                it('cannot re-execute vote', async () => {
-                    await voting.vote(voteId, true, { from: holder51 }) // causes execution
+                it('cannot execute vote twice', async () => {
+                    await voting.vote(voteId, true, { from: holder51 })
+                    await voting.mockIncreaseTime(votingDuration + 1)
+                    await voting.executeVote(voteId)
                     await assertRevert(voting.executeVote(voteId), errors.VOTING_CAN_NOT_EXECUTE)
                 })
 
                 it('cannot execute unvoted finished vote', async () => {
                     await voting.mockIncreaseTime(votingDuration + 1)
                     await assertRevert(voting.executeVote(voteId), errors.VOTING_CAN_NOT_EXECUTE)
+                })
+
+                it("voter can't change vote", async () => {
+                    await voting.vote(voteId, true, { from: holder29 })
+                    await assertRevert(voting.vote(voteId, false, { from: holder29 }), errors.VOTING_CAN_NOT_VOTE)
                 })
 
                 it('cannot execute unvoted vote before start time', async () => {
@@ -380,11 +387,6 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
                     const [_newVoteOpen, _newVoteExecuted, newVoteStartDate] = await voting.getVote(newVoteId)
                     assert.equal(newVoteStartDate, expectedVoteStartDate)
-                })
-
-                it("holder can't modify vote", async () => {
-                    await voting.vote(voteId, true, { from: holder29 })
-                    await assertRevert(voting.vote(voteId, false, { from: holder29 }), errors.VOTING_CAN_NOT_VOTE)
                 })
 
                 it("last yea vote time for voter set to start time of vote voted for", async () => {
@@ -484,7 +486,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
             assert.isFalse(await voting.canExecute(voteId), 'vote cannot be executed')
 
-            voting.vote(voteId, true, { from: holder1 })
+            await voting.vote(voteId, true, { from: holder1 })
 
             const [isOpen, isExecuted] = await voting.getVote(voteId)
 
