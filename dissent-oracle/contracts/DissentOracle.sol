@@ -54,7 +54,7 @@ contract DissentOracle is AragonApp, IACLOracle {
     }
 
     function canPerform(address who, address where, bytes32 what, uint256[] how) external view returns (bool) {
-        return dissentVoting.lastYeaVoteTime(who) < now - dissentWindow;
+        return dissentVoting.lastYeaVoteTime(who) + dissentWindow < getTimestamp();
     }
 
 }

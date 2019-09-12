@@ -1,4 +1,4 @@
-const DissentOracle = artifacts.require('DissentOracle.sol')
+const DissentOracle = artifacts.require('DissentOracleMock.sol')
 // TODO: Rename to DandelionVoting
 const DandelionVoting = artifacts.require('VotingMock.sol')
 const MiniMeToken = artifacts.require('MiniMeToken.sol')
@@ -17,20 +17,19 @@ const bigExp = (x, y) => new BN(x).mul(new BN(10).pow(new BN(y)))
 const pct16 = x => bigExp(x, 16)
 const createdVoteId = receipt => getLog(receipt, 'StartVote', 'voteId')
 
-
-// TODO: Split integration tests into a separate truffle project? Might be overkill, depends how many there are.
+// TODO: Add integration tests with permissions with params
 contract('DissentOracle', ([appManager, voter]) => {
 
     let dissentOracle, dissentOracleBase, dandelionVoting, dandelionVotingBase, voteToken
     let SET_DISSENT_VOTING_ROLE, SET_DISSENT_WINDOW_ROLE, CREATE_VOTES_ROLE
     let dao, acl
 
-    const DISSENT_WINDOW = 60 * 60 * 24 // 1 day
+    const DISSENT_WINDOW = 60 * 60 * 24 * 2 // 2 days
     const VOTE_TOKEN_DECIMALS = 18
 
     const neededSupport = pct16(50)
     const minimumAcceptanceQuorum = pct16(20)
-    const votingDuration = 1000
+    const votingDuration = 60 * 60 * 24 // 1 day
 
     before('deploy base apps', async () => {
         dissentOracleBase = await DissentOracle.new()
@@ -46,7 +45,7 @@ contract('DissentOracle', ([appManager, voter]) => {
         dao = daoDeployment.dao
         acl = daoDeployment.acl
 
-        voteToken = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'n', 0, 'n', true)
+        voteToken = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'n', VOTE_TOKEN_DECIMALS, 'n', true)
 
         const newDandelionVotingReceipt = await dao.newAppInstance(
             hash('dandelion-voting.aragonpm.test'), dandelionVotingBase.address, '0x', false, {from: appManager})
@@ -58,7 +57,7 @@ contract('DissentOracle', ([appManager, voter]) => {
 
         await acl.createPermission(appManager, dissentOracle.address, SET_DISSENT_WINDOW_ROLE, appManager, {from: appManager})
         await acl.createPermission(appManager, dissentOracle.address, SET_DISSENT_VOTING_ROLE, appManager, {from: appManager})
-        await acl.createPermission(appManager, dandelionVoting.address, CREATE_VOTES_ROLE, appManager, {from: appManager})
+        await acl.createPermission(ANY_ADDRESS, dandelionVoting.address, CREATE_VOTES_ROLE, appManager, {from: appManager})
 
         await dandelionVoting.initialize(voteToken.address, neededSupport, minimumAcceptanceQuorum, votingDuration)
     })
@@ -66,7 +65,7 @@ contract('DissentOracle', ([appManager, voter]) => {
     describe("initialize(address _dandelionVoting, uint256 _dissentWindow)", async () => {
 
         beforeEach(async () => {
-            // await dissentOracle.initialize(dandelionVoting.address, DISSENT_WINDOW)
+            await dissentOracle.initialize(dandelionVoting.address, DISSENT_WINDOW)
         })
 
         it('should initialize with correct parameters', async () => {
@@ -109,17 +108,32 @@ contract('DissentOracle', ([appManager, voter]) => {
             let voteId
 
             beforeEach(async () => {
-                await voteToken.generateTokens(voter, 10)
-                voteId = createdVoteId(await dandelionVoting.newVote(encodeCallScript([]), ''))
+                await voteToken.generateTokens(voter, bigExp(20, VOTE_TOKEN_DECIMALS))
+                voteId = createdVoteId(await dandelionVoting.newVote(encodeCallScript([]), ''), {from: appManager})
             })
 
-            it('returns true when last yea vote before dissent window', async () => {
+            it('returns true when last yea vote after dissent window', async () => {
                 await dandelionVoting.vote(voteId, true, false, {from: voter})
-
+                await dissentOracle.mockIncreaseTime(DISSENT_WINDOW + 1)
+                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [])
+                assert.isTrue(actualCanPerform)
             })
 
-            it.only('returns false when last yea vote within dissent window', async () => {
+            it('returns true when last vote no but within dissent window', async () => {
+                await dandelionVoting.vote(voteId, false, false, {from: voter})
+                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [])
+                assert.isTrue(actualCanPerform)
+            })
+
+            it('returns false when last yea vote within dissent window', async () => {
                 await dandelionVoting.vote(voteId, true, false, {from: voter})
+                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [])
+                assert.isFalse(actualCanPerform)
+            })
+
+            it('returns false when last yea vote just before end of dissent window', async () => {
+                await dandelionVoting.vote(voteId, true, false, {from: voter})
+                await dissentOracle.mockIncreaseTime(DISSENT_WINDOW - 1)
                 const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [])
                 assert.isFalse(actualCanPerform)
             })
