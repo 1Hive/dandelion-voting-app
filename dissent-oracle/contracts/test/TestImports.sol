@@ -5,6 +5,7 @@ import "@aragon/os/contracts/kernel/Kernel.sol";
 import "@aragon/os/contracts/factory/DAOFactory.sol";
 import "@aragon/os/contracts/factory/EVMScriptRegistryFactory.sol";
 import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
+import "../../../contracts/test/mocks/VotingMock.sol";
 
 contract TestImports {
     constructor() public {

@@ -5,7 +5,8 @@
   "dependencies": {
     "@aragon/apps-shared-minime": "^1.0.2",
     "@aragon/client": "^1.1.0",
-    "@aragon/os": "^4.2.1"
+    "@aragon/os": "^4.2.1",
+    "bn.js": "^5.0.0"
   },
   "devDependencies": {
     "@aragon/cli": "^6.0.0",
