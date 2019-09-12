@@ -1,0 +1,10 @@
+{
+  "name": "Dissent Oracle",
+  "description": "Prevent engagement when a user has recently voted in favour of proposals",
+  "icons": [
+    {
+      "src": "/images/icon.png",
+      "sizes": "192x192"
+    }
+  ]
+}
