@@ -178,7 +178,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 let script = encodeCallScript([action])
                 script = script.slice(0, -2) // remove one byte from calldata for it to fail
                 const voteId = createdVoteId(await voting.newVote(script, '', true, { from: holder51 }))
-                await voting.mockIncreaseTime(votingDuration)
+                await voting.mockIncreaseTime(votingDuration + 1)
                 await assertRevert(voting.executeVote(voteId))
             })
 
@@ -313,8 +313,10 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     await assertRevert(voting.executeVote(voteId), errors.VOTING_CAN_NOT_EXECUTE)
                 })
 
-                it('cannot re-execute vote', async () => {
-                    await voting.vote(voteId, true, { from: holder51 }) // causes execution
+                it('cannot execute vote twice', async () => {
+                    await voting.vote(voteId, true, { from: holder51 })
+                    await voting.mockIncreaseTime(votingDuration + 1)
+                    await voting.executeVote(voteId)
                     await assertRevert(voting.executeVote(voteId), errors.VOTING_CAN_NOT_EXECUTE)
                 })
 
@@ -324,7 +326,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 })
 
                 // TODO: NEW/MODIFIED TESTS TO END OF DESCRIBE, COMMENT PURPOSE TO HIGHLIGHT, REMOVE COMMENT WHEN FINALISED
-                it("holder can't modify vote", async () => {
+                it("voter can't change vote", async () => {
                     await voting.vote(voteId, true, { from: holder29 })
                     await assertRevert(voting.vote(voteId, false, { from: holder29 }), errors.VOTING_CAN_NOT_VOTE)
                 })
@@ -427,7 +429,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
             assert.isFalse(await voting.canExecute(voteId), 'vote cannot be executed')
 
-            voting.vote(voteId, true, { from: holder1 })
+            await voting.vote(voteId, true, { from: holder1 })
 
             const [isOpen, isExecuted] = await voting.getVote(voteId)
 
