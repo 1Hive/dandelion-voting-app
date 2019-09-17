@@ -45,7 +45,6 @@ contract DandelionVoting is IForwarder, AragonApp {
         uint64 minAcceptQuorumPct;
         uint256 yea;
         uint256 nay;
-        uint256 votingPower;
         bytes executionScript;
         mapping (address => VoterState) voters;
     }
@@ -232,7 +231,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     * @param _voteId Vote identifier
     * @return Vote open status
     * @return Vote executed status
-    * @return Vote start date
+    * @return Vote start block
     * @return Vote snapshot block
     * @return Vote support required
     * @return Vote minimum acceptance quorum
@@ -254,7 +253,6 @@ contract DandelionVoting is IForwarder, AragonApp {
             uint64 minAcceptQuorum,
             uint256 yea,
             uint256 nay,
-            uint256 votingPower,
             bytes script
         )
     {
@@ -268,7 +266,6 @@ contract DandelionVoting is IForwarder, AragonApp {
         minAcceptQuorum = vote_.minAcceptQuorumPct;
         yea = vote_.yea;
         nay = vote_.nay;
-        votingPower = vote_.votingPower;
         script = vote_.executionScript;
     }
 
@@ -288,21 +285,17 @@ contract DandelionVoting is IForwarder, AragonApp {
     * @return voteId id for newly created vote
     */
     function _newVote(bytes _executionScript, string _metadata, bool _castVote) internal returns (uint256 voteId) {
-        uint64 snapshotBlock = getBlockNumber64() - 1; // avoid double voting in this very block
-        uint256 votingPower = token.totalSupplyAt(snapshotBlock);
-        require(votingPower > 0, ERROR_NO_VOTING_POWER);
-
         voteId = votesLength++;
 
         uint64 previousVoteStartBlock = voteId == 0 ? 0 : votes[voteId.sub(1)].startBlock;
         uint64 earliestStartBlock = previousVoteStartBlock == 0 ? 0 : previousVoteStartBlock.add(voteBufferBlocks);
+        uint64 startBlock = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
 
         Vote storage vote_ = votes[voteId];
-        vote_.startBlock = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
-        vote_.snapshotBlock = snapshotBlock;
+        vote_.startBlock = startBlock;
+        vote_.snapshotBlock = startBlock - 1; // avoid double voting in this very block
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
-        vote_.votingPower = votingPower;
         vote_.executionScript = _executionScript;
 
         emit StartVote(voteId, msg.sender, _metadata);
@@ -361,6 +354,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     */
     function _canExecute(uint256 _voteId) internal view returns (bool) {
         Vote storage vote_ = votes[_voteId];
+        uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
 
         if (_isVoteOpen(vote_)) {
             return false;
@@ -371,7 +365,7 @@ contract DandelionVoting is IForwarder, AragonApp {
         }
 
         // Voting is already decided
-        if (_isValuePct(vote_.yea, vote_.votingPower, vote_.supportRequiredPct)) {
+        if (_isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.supportRequiredPct)) {
             return true;
         }
 
@@ -381,7 +375,7 @@ contract DandelionVoting is IForwarder, AragonApp {
             return false;
         }
         // Has min quorum?
-        if (!_isValuePct(vote_.yea, vote_.votingPower, vote_.minAcceptQuorumPct)) {
+        if (!_isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.minAcceptQuorumPct)) {
             return false;
         }
 
@@ -394,7 +388,9 @@ contract DandelionVoting is IForwarder, AragonApp {
     */
     function _canVote(uint256 _voteId, address _voter) internal view returns (bool) {
         Vote storage vote_ = votes[_voteId];
-        return _isVoteOpen(vote_) && token.balanceOfAt(_voter, vote_.snapshotBlock) > 0 && _hasNotVoted(vote_, _voter);
+        uint256 balanceAtSnapshot = token.balanceOfAt(_voter, vote_.snapshotBlock);
+
+        return _isVoteOpen(vote_) && balanceAtSnapshot > 0 && _hasNotVoted(vote_, _voter);
     }
 
     /**
@@ -402,7 +398,8 @@ contract DandelionVoting is IForwarder, AragonApp {
     * @return True if the given vote is open, false otherwise
     */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
-        return getBlockNumber64() >= vote_.startBlock && getBlockNumber64() < vote_.startBlock.add(voteDurationBlocks);
+        uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
+        return votingPowerAtSnapshot > 0 && getBlockNumber64() >= vote_.startBlock && getBlockNumber64() < vote_.startBlock.add(voteDurationBlocks);
     }
 
     /**
