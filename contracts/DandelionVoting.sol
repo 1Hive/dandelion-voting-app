@@ -20,7 +20,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     bytes32 public constant CREATE_VOTES_ROLE = keccak256("CREATE_VOTES_ROLE");
     bytes32 public constant MODIFY_SUPPORT_ROLE = keccak256("MODIFY_SUPPORT_ROLE");
     bytes32 public constant MODIFY_QUORUM_ROLE = keccak256("MODIFY_QUORUM_ROLE");
-    bytes32 public constant MODIFY_BUFFER_TIME_ROLE = keccak256("MODIFY_BUFFER_TIME_ROLE");
+    bytes32 public constant MODIFY_BUFFER_BLOCKS_ROLE = keccak256("MODIFY_BUFFER_BLOCKS_ROLE");
 
     uint64 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10^16; 100% = 10^18
 
@@ -39,7 +39,7 @@ contract DandelionVoting is IForwarder, AragonApp {
 
     struct Vote {
         bool executed;
-        uint64 startDate;
+        uint64 startBlock;
         uint64 snapshotBlock;
         uint64 supportRequiredPct;
         uint64 minAcceptQuorumPct;
@@ -53,20 +53,20 @@ contract DandelionVoting is IForwarder, AragonApp {
     MiniMeToken public token;
     uint64 public supportRequiredPct;
     uint64 public minAcceptQuorumPct;
-    uint64 public voteTime;
-    uint64 public bufferTime;
+    uint64 public voteDurationBlocks;
+    uint64 public voteBufferBlocks;
 
     // We are mimicing an array, we use a mapping instead to make app upgrade more graceful
     mapping (uint256 => Vote) internal votes;
     uint256 public votesLength;
-    mapping (address => uint64) public lastYeaVoteTime;
+    mapping (address => uint64) public lastYeaVoteBlock;
 
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
     event ExecuteVote(uint256 indexed voteId);
     event ChangeSupportRequired(uint64 supportRequiredPct);
     event ChangeMinQuorum(uint64 minAcceptQuorumPct);
-    event ChangeBufferTime(uint64 bufferTime);
+    event ChangeVoteBufferBlocks(uint64 voteBufferBlocks);
 
     modifier voteExists(uint256 _voteId) {
         require(_voteId < votesLength, ERROR_NO_VOTE);
@@ -74,14 +74,14 @@ contract DandelionVoting is IForwarder, AragonApp {
     }
 
     /**
-    * @notice Initialize Voting app with `_token.symbol(): string` for governance, minimum support of `@formatPct(_supportRequiredPct)`%, minimum acceptance quorum of `@formatPct(_minAcceptQuorumPct)`%, and a voting duration of `@transformTime(_voteTime)`
+    * @notice Initialize Voting app with `_token.symbol(): string` for governance, minimum support of `@formatPct(_supportRequiredPct)`%, minimum acceptance quorum of `@formatPct(_minAcceptQuorumPct)`%, a voting duration of `_voteDurationBlocks` blocks, and a vote buffer of `_voteBufferBlocks` blocks
     * @param _token MiniMeToken Address that will be used as governance token
     * @param _supportRequiredPct Percentage of yeas in casted votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
     * @param _minAcceptQuorumPct Percentage of yeas in total possible votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
-    * @param _voteTime Seconds that a vote will be open for token holders to vote (unless enough yeas or nays have been cast to make an early decision)
-    * @param _bufferTime Minimum number of seconds between the start time of each vote
+    * @param _voteDurationBlocks Blocks that a vote will be open for token holders to vote
+    * @param _voteBufferBlocks Minimum number of blocks between the start block of each vote
     */
-    function initialize(MiniMeToken _token, uint64 _supportRequiredPct, uint64 _minAcceptQuorumPct, uint64 _voteTime, uint64 _bufferTime)
+    function initialize(MiniMeToken _token, uint64 _supportRequiredPct, uint64 _minAcceptQuorumPct, uint64 _voteDurationBlocks, uint64 _voteBufferBlocks)
         external
         onlyInit
     {
@@ -93,8 +93,8 @@ contract DandelionVoting is IForwarder, AragonApp {
         token = _token;
         supportRequiredPct = _supportRequiredPct;
         minAcceptQuorumPct = _minAcceptQuorumPct;
-        voteTime = _voteTime;
-        bufferTime = _bufferTime;
+        voteDurationBlocks = _voteDurationBlocks;
+        voteBufferBlocks = _voteBufferBlocks;
     }
 
     /**
@@ -127,13 +127,13 @@ contract DandelionVoting is IForwarder, AragonApp {
     }
 
     /**
-    * @notice Change buffer period to `@transformTime(_bufferTime)`
-    * @param _bufferTime New buffer time
+    * @notice Change vote buffer to `_voteBufferBlocks` blocks
+    * @param _voteBufferBlocks New vote buffer defined in blocks
     */
-    function changeBufferTime(uint64 _bufferTime) external auth(MODIFY_BUFFER_TIME_ROLE) {
-        bufferTime = _bufferTime;
+    function changeVoteBufferBlocks(uint64 _voteBufferBlocks) external auth(MODIFY_BUFFER_BLOCKS_ROLE) {
+        voteBufferBlocks = _voteBufferBlocks;
 
-        emit ChangeBufferTime(_bufferTime);
+        emit ChangeVoteBufferBlocks(_voteBufferBlocks);
     }
 
     /**
@@ -248,7 +248,7 @@ contract DandelionVoting is IForwarder, AragonApp {
         returns (
             bool open,
             bool executed,
-            uint64 startDate,
+            uint64 startBlock,
             uint64 snapshotBlock,
             uint64 supportRequired,
             uint64 minAcceptQuorum,
@@ -262,7 +262,7 @@ contract DandelionVoting is IForwarder, AragonApp {
 
         open = _isVoteOpen(vote_);
         executed = vote_.executed;
-        startDate = vote_.startDate;
+        startBlock = vote_.startBlock;
         snapshotBlock = vote_.snapshotBlock;
         supportRequired = vote_.supportRequiredPct;
         minAcceptQuorum = vote_.minAcceptQuorumPct;
@@ -294,11 +294,11 @@ contract DandelionVoting is IForwarder, AragonApp {
 
         voteId = votesLength++;
 
-        uint64 previousVoteStartDate = voteId == 0 ? 0 : votes[voteId.sub(1)].startDate;
-        uint64 earliestStartDate = previousVoteStartDate == 0 ? 0 : previousVoteStartDate.add(bufferTime);
+        uint64 previousVoteStartBlock = voteId == 0 ? 0 : votes[voteId.sub(1)].startBlock;
+        uint64 earliestStartBlock = previousVoteStartBlock == 0 ? 0 : previousVoteStartBlock.add(voteBufferBlocks);
 
         Vote storage vote_ = votes[voteId];
-        vote_.startDate = earliestStartDate < getTimestamp64() ? getTimestamp64() : earliestStartDate;
+        vote_.startBlock = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
         vote_.snapshotBlock = snapshotBlock;
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
@@ -323,7 +323,7 @@ contract DandelionVoting is IForwarder, AragonApp {
 
         if (_supports) {
             vote_.yea = vote_.yea.add(voterStake);
-            lastYeaVoteTime[_voter] = lastYeaVoteTime[_voter] < vote_.startDate ? vote_.startDate : lastYeaVoteTime[_voter];
+            lastYeaVoteBlock[_voter] = lastYeaVoteBlock[_voter] < vote_.startBlock ? vote_.startBlock : lastYeaVoteBlock[_voter];
         } else {
             vote_.nay = vote_.nay.add(voterStake);
         }
@@ -402,7 +402,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     * @return True if the given vote is open, false otherwise
     */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
-        return getTimestamp64() >= vote_.startDate && getTimestamp64() < vote_.startDate.add(voteTime);
+        return getBlockNumber64() >= vote_.startBlock && getBlockNumber64() < vote_.startBlock.add(voteDurationBlocks);
     }
 
     /**
