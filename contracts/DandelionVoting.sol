@@ -131,7 +131,6 @@ contract DandelionVoting is IForwarder, AragonApp {
     */
     function changeVoteBufferBlocks(uint64 _voteBufferBlocks) external auth(MODIFY_BUFFER_BLOCKS_ROLE) {
         voteBufferBlocks = _voteBufferBlocks;
-
         emit ChangeVoteBufferBlocks(_voteBufferBlocks);
     }
 
@@ -287,8 +286,8 @@ contract DandelionVoting is IForwarder, AragonApp {
     function _newVote(bytes _executionScript, string _metadata, bool _castVote) internal returns (uint256 voteId) {
         voteId = votesLength++;
 
-        uint64 previousVoteStartBlock = voteId == 0 ? 0 : votes[voteId.sub(1)].startBlock;
-        uint64 earliestStartBlock = previousVoteStartBlock == 0 ? 0 : previousVoteStartBlock.add(voteBufferBlocks);
+        uint64 previousVoteStartBlock = voteId == 0 ? 1 : votes[voteId - 1].startBlock;
+        uint64 earliestStartBlock = previousVoteStartBlock == 1 ? 1 : previousVoteStartBlock.add(voteBufferBlocks);
         uint64 startBlock = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
 
         Vote storage vote_ = votes[voteId];

@@ -377,14 +377,15 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     assert.equal(thirdVoteSnapshotBlock, expectedVoteStartBlock - 1)
                 })
 
-                it("sets second vote start block correctly when vote created after vote buffer elapsed", async () => {
+                it("sets second vote start and snapshot block correctly when vote created after vote buffer elapsed", async () => {
                     const expectedVoteStartBlock = await getBlockNumber() + bufferBlocks + 1
                     await voting.mockAdvanceBlocks(bufferBlocks)
 
                     const newVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder51 }));
 
-                    const [_newVoteOpen, _newVoteExecuted, newVoteStartBlock] = await voting.getVote(newVoteId)
+                    const [_newVoteOpen, _newVoteExecuted, newVoteStartBlock, newVoteSnapshotBlock] = await voting.getVote(newVoteId)
                     assert.equal(newVoteStartBlock, expectedVoteStartBlock)
+                    assert.equal(newVoteSnapshotBlock, expectedVoteStartBlock - 1)
                 })
 
                 it("last yea vote block for voter set to start block of vote voted for", async () => {
