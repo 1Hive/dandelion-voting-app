@@ -4,6 +4,11 @@
       "name": "Set the dissent window",
       "id": "SET_DISSENT_WINDOW_ROLE",
       "params": []
+    }, ,
+    {
+      "name": "Set the dandelion voting address",
+      "id": "SET_DISSENT_VOTING_ROLE",
+      "params": []
     }
   ],
   "environments": {
