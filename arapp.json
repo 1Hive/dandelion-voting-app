@@ -52,7 +52,12 @@
         "New quorum",
         "Current quorum"
       ]
+    },
+    {
+      "name": "Modify buffer blocks",
+      "id": "MODIFY_BUFFER_BLOCKS_ROLE",
+      "params": []
     }
   ],
-  "path": "contracts/Voting.sol"
+  "path": "contracts/DandelionVoting.sol"
 }
