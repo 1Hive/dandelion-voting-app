@@ -56,16 +56,24 @@ contract DissentOracle is AragonApp, IACLOracle {
 
     /**
     * @notice ACLOracle
-    * @dev IACLOracle interface conformance
+    * @dev IACLOracle interface conformance. If the ACLOracle permissioned function uses a forwarder and needs to
+    *      pass parameters, it should be used with the modifier 'authP(SOME_ACL_ROLE, arr(voter, dissentWindowBlocks))'
     */
-    function canPerform(address who, address where, bytes32 what, uint256[] how) external view returns (bool) {
+    function canPerform(address _who, address _where, bytes32 _what, uint256[] _how) external view returns (bool) {
+
+        address voter = _who;
+        uint64 dissentWindowBlocksLocal = dissentWindowBlocks;
+
+        if (_how.length > 0) {
+            voter = address(_how[0]);
+            dissentWindowBlocksLocal = uint64(_how[1]);
+        }
+
         // We check hasNeverVotedYea for the edge case where the chains current block number is less than the
         // dissentWindowBlocks and canPerform would return false even if "who" has not voted, when it should return true.
-        bool hasNeverVotedYea = dandelionVoting.lastYeaVoteBlock(who) == 0;
+        bool hasNeverVotedYea = dandelionVoting.lastYeaVoteBlock(voter) == 0;
 
-        // TODO: Consider args passed in 'how'
-
-        return dandelionVoting.lastYeaVoteBlock(who).add(dissentWindowBlocks) < getBlockNumber64() || hasNeverVotedYea;
+        return dandelionVoting.lastYeaVoteBlock(voter).add(dissentWindowBlocksLocal) < getBlockNumber64() || hasNeverVotedYea;
     }
 
 }

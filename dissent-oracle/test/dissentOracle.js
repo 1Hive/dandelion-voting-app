@@ -18,7 +18,7 @@ const pct16 = x => bigExp(x, 16)
 const createdVoteId = receipt => getLog(receipt, 'StartVote', 'voteId')
 
 // TODO: Consider adding further integration tests with permissions with params
-contract('DissentOracle', ([appManager, voter]) => {
+contract('DissentOracle', ([appManager, voter, voter2]) => {
 
     let dissentOracle, dissentOracleBase, dandelionVoting, dandelionVotingBase, voteToken
     let SET_DANDELION_VOTING_ROLE, SET_DISSENT_WINDOW_ROLE, CREATE_VOTES_ROLE
@@ -104,7 +104,7 @@ contract('DissentOracle', ([appManager, voter]) => {
             })
         })
 
-        describe('canPerform(address who, address where, bytes32 what, uint256[] how)', () => {
+        describe('canPerform(address _who, address _where, bytes32 _what, uint256[] _how)', () => {
 
             let voteId
 
@@ -137,6 +137,25 @@ contract('DissentOracle', ([appManager, voter]) => {
                 await dandelionVoting.vote(voteId, false, {from: voter})
                 const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [])
                 assert.isTrue(actualCanPerform)
+            })
+
+            it('returns true when passed voter and dissent window in params and yea voter dissent window passed', async () => {
+                const permissionParamsDissentWindow = DISSENT_WINDOW - 300
+                await dandelionVoting.vote(voteId, true, {from: voter})
+                await dissentOracle.mockAdvanceBlocks(permissionParamsDissentWindow)
+
+                const actualCanPerform = await dissentOracle.canPerform(ANY_ADDRESS, ANY_ADDRESS, '0x', [voter, permissionParamsDissentWindow])
+
+                assert.isTrue(actualCanPerform)
+            })
+
+            it('returns false when passed voter and dissent window in params and within yea voter dissent window', async () => {
+                const permissionParamsDissentWindow = DISSENT_WINDOW - 300
+                await dandelionVoting.vote(voteId, true, {from: voter})
+
+                const actualCanPerform = await dissentOracle.canPerform(ANY_ADDRESS, ANY_ADDRESS, '0x', [voter, permissionParamsDissentWindow])
+
+                assert.isFalse(actualCanPerform)
             })
         })
     })
