@@ -1,5 +1,4 @@
 const DissentOracle = artifacts.require('DissentOracleMock.sol')
-// TODO: Rename to DandelionVoting
 const DandelionVoting = artifacts.require('VotingMock.sol')
 const MiniMeToken = artifacts.require('MiniMeToken.sol')
 
