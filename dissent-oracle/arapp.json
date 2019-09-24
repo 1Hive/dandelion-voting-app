@@ -7,7 +7,7 @@
     }, ,
     {
       "name": "Set the dandelion voting address",
-      "id": "SET_DISSENT_VOTING_ROLE",
+      "id": "SET_DANDELION_VOTING_ROLE",
       "params": []
     }
   ],
