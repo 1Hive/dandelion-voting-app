@@ -13,13 +13,14 @@ import "@aragon/os/contracts/lib/math/SafeMath64.sol";
 import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 
 
-contract DissentVoting is IForwarder, AragonApp {
+contract DandelionVoting is IForwarder, AragonApp {
     using SafeMath for uint256;
     using SafeMath64 for uint64;
 
     bytes32 public constant CREATE_VOTES_ROLE = keccak256("CREATE_VOTES_ROLE");
     bytes32 public constant MODIFY_SUPPORT_ROLE = keccak256("MODIFY_SUPPORT_ROLE");
     bytes32 public constant MODIFY_QUORUM_ROLE = keccak256("MODIFY_QUORUM_ROLE");
+    bytes32 public constant MODIFY_BUFFER_BLOCKS_ROLE = keccak256("MODIFY_BUFFER_BLOCKS_ROLE");
 
     uint64 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10^16; 100% = 10^18
 
@@ -38,13 +39,12 @@ contract DissentVoting is IForwarder, AragonApp {
 
     struct Vote {
         bool executed;
-        uint64 startDate;
+        uint64 startBlock;
         uint64 snapshotBlock;
         uint64 supportRequiredPct;
         uint64 minAcceptQuorumPct;
         uint256 yea;
         uint256 nay;
-        uint256 votingPower;
         bytes executionScript;
         mapping (address => VoterState) voters;
     }
@@ -52,18 +52,20 @@ contract DissentVoting is IForwarder, AragonApp {
     MiniMeToken public token;
     uint64 public supportRequiredPct;
     uint64 public minAcceptQuorumPct;
-    uint64 public voteTime;
+    uint64 public voteDurationBlocks;
+    uint64 public voteBufferBlocks;
 
     // We are mimicing an array, we use a mapping instead to make app upgrade more graceful
     mapping (uint256 => Vote) internal votes;
     uint256 public votesLength;
-    mapping (address => uint64) public lastYeaVoteTime;
+    mapping (address => uint64) public lastYeaVoteBlock;
 
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
     event ExecuteVote(uint256 indexed voteId);
     event ChangeSupportRequired(uint64 supportRequiredPct);
     event ChangeMinQuorum(uint64 minAcceptQuorumPct);
+    event ChangeVoteBufferBlocks(uint64 voteBufferBlocks);
 
     modifier voteExists(uint256 _voteId) {
         require(_voteId < votesLength, ERROR_NO_VOTE);
@@ -71,13 +73,17 @@ contract DissentVoting is IForwarder, AragonApp {
     }
 
     /**
-    * @notice Initialize Voting app with `_token.symbol(): string` for governance, minimum support of `@formatPct(_supportRequiredPct)`%, minimum acceptance quorum of `@formatPct(_minAcceptQuorumPct)`%, and a voting duration of `@transformTime(_voteTime)`
+    * @notice Initialize Voting app with `_token.symbol(): string` for governance, minimum support of `@formatPct(_supportRequiredPct)`%, minimum acceptance quorum of `@formatPct(_minAcceptQuorumPct)`%, a voting duration of `_voteDurationBlocks` blocks, and a vote buffer of `_voteBufferBlocks` blocks
     * @param _token MiniMeToken Address that will be used as governance token
     * @param _supportRequiredPct Percentage of yeas in casted votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
     * @param _minAcceptQuorumPct Percentage of yeas in total possible votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
-    * @param _voteTime Seconds that a vote will be open for token holders to vote (unless enough yeas or nays have been cast to make an early decision)
+    * @param _voteDurationBlocks Blocks that a vote will be open for token holders to vote
+    * @param _voteBufferBlocks Minimum number of blocks between the start block of each vote
     */
-    function initialize(MiniMeToken _token, uint64 _supportRequiredPct, uint64 _minAcceptQuorumPct, uint64 _voteTime) external onlyInit {
+    function initialize(MiniMeToken _token, uint64 _supportRequiredPct, uint64 _minAcceptQuorumPct, uint64 _voteDurationBlocks, uint64 _voteBufferBlocks)
+        external
+        onlyInit
+    {
         initialized();
 
         require(_minAcceptQuorumPct <= _supportRequiredPct, ERROR_INIT_PCTS);
@@ -86,7 +92,8 @@ contract DissentVoting is IForwarder, AragonApp {
         token = _token;
         supportRequiredPct = _supportRequiredPct;
         minAcceptQuorumPct = _minAcceptQuorumPct;
-        voteTime = _voteTime;
+        voteDurationBlocks = _voteDurationBlocks;
+        voteBufferBlocks = _voteBufferBlocks;
     }
 
     /**
@@ -119,13 +126,12 @@ contract DissentVoting is IForwarder, AragonApp {
     }
 
     /**
-    * @notice Create a new vote about "`_metadata`"
-    * @param _executionScript EVM script to be executed on approval
-    * @param _metadata Vote metadata
-    * @return voteId Id for newly created vote
+    * @notice Change vote buffer to `_voteBufferBlocks` blocks
+    * @param _voteBufferBlocks New vote buffer defined in blocks
     */
-    function newVote(bytes _executionScript, string _metadata) external auth(CREATE_VOTES_ROLE) returns (uint256 voteId) {
-        return _newVote(_executionScript, _metadata, true, true);
+    function changeVoteBufferBlocks(uint64 _voteBufferBlocks) external auth(MODIFY_BUFFER_BLOCKS_ROLE) {
+        voteBufferBlocks = _voteBufferBlocks;
+        emit ChangeVoteBufferBlocks(_voteBufferBlocks);
     }
 
     /**
@@ -133,15 +139,14 @@ contract DissentVoting is IForwarder, AragonApp {
     * @param _executionScript EVM script to be executed on approval
     * @param _metadata Vote metadata
     * @param _castVote Whether to also cast newly created vote
-    * @param _executesIfDecided Whether to also immediately execute newly created vote if decided
     * @return voteId id for newly created vote
     */
-    function newVote(bytes _executionScript, string _metadata, bool _castVote, bool _executesIfDecided)
+    function newVote(bytes _executionScript, string _metadata, bool _castVote)
         external
         auth(CREATE_VOTES_ROLE)
         returns (uint256 voteId)
     {
-        return _newVote(_executionScript, _metadata, _castVote, _executesIfDecided);
+        return _newVote(_executionScript, _metadata, _castVote);
     }
 
     /**
@@ -150,11 +155,10 @@ contract DissentVoting is IForwarder, AragonApp {
     *      created via `newVote(),` which requires initialization
     * @param _voteId Id for vote
     * @param _supports Whether voter supports the vote
-    * @param _executesIfDecided Whether the vote should execute its action if it becomes decided
     */
-    function vote(uint256 _voteId, bool _supports, bool _executesIfDecided) external voteExists(_voteId) {
+    function vote(uint256 _voteId, bool _supports) external voteExists(_voteId) {
         require(_canVote(_voteId, msg.sender), ERROR_CAN_NOT_VOTE);
-        _vote(_voteId, _supports, msg.sender, _executesIfDecided);
+        _vote(_voteId, _supports, msg.sender);
     }
 
     /**
@@ -185,7 +189,7 @@ contract DissentVoting is IForwarder, AragonApp {
     */
     function forward(bytes _evmScript) public {
         require(canForward(msg.sender, _evmScript), ERROR_CAN_NOT_FORWARD);
-        _newVote(_evmScript, "", true, true);
+        _newVote(_evmScript, "", true);
     }
 
     /**
@@ -226,7 +230,7 @@ contract DissentVoting is IForwarder, AragonApp {
     * @param _voteId Vote identifier
     * @return Vote open status
     * @return Vote executed status
-    * @return Vote start date
+    * @return Vote start block
     * @return Vote snapshot block
     * @return Vote support required
     * @return Vote minimum acceptance quorum
@@ -242,13 +246,12 @@ contract DissentVoting is IForwarder, AragonApp {
         returns (
             bool open,
             bool executed,
-            uint64 startDate,
+            uint64 startBlock,
             uint64 snapshotBlock,
             uint64 supportRequired,
             uint64 minAcceptQuorum,
             uint256 yea,
             uint256 nay,
-            uint256 votingPower,
             bytes script
         )
     {
@@ -256,13 +259,12 @@ contract DissentVoting is IForwarder, AragonApp {
 
         open = _isVoteOpen(vote_);
         executed = vote_.executed;
-        startDate = vote_.startDate;
+        startBlock = vote_.startBlock;
         snapshotBlock = vote_.snapshotBlock;
         supportRequired = vote_.supportRequiredPct;
         minAcceptQuorum = vote_.minAcceptQuorumPct;
         yea = vote_.yea;
         nay = vote_.nay;
-        votingPower = vote_.votingPower;
         script = vote_.executionScript;
     }
 
@@ -281,32 +283,31 @@ contract DissentVoting is IForwarder, AragonApp {
     * @dev Internal function to create a new vote
     * @return voteId id for newly created vote
     */
-    function _newVote(bytes _executionScript, string _metadata, bool _castVote, bool _executesIfDecided) internal returns (uint256 voteId) {
-        uint64 snapshotBlock = getBlockNumber64() - 1; // avoid double voting in this very block
-        uint256 votingPower = token.totalSupplyAt(snapshotBlock);
-        require(votingPower > 0, ERROR_NO_VOTING_POWER);
-
+    function _newVote(bytes _executionScript, string _metadata, bool _castVote) internal returns (uint256 voteId) {
         voteId = votesLength++;
 
+        uint64 previousVoteStartBlock = voteId == 0 ? 1 : votes[voteId - 1].startBlock;
+        uint64 earliestStartBlock = previousVoteStartBlock == 1 ? 1 : previousVoteStartBlock.add(voteBufferBlocks);
+        uint64 startBlock = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
+
         Vote storage vote_ = votes[voteId];
-        vote_.startDate = getTimestamp64();
-        vote_.snapshotBlock = snapshotBlock;
+        vote_.startBlock = startBlock;
+        vote_.snapshotBlock = startBlock - 1; // avoid double voting in this very block
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
-        vote_.votingPower = votingPower;
         vote_.executionScript = _executionScript;
 
         emit StartVote(voteId, msg.sender, _metadata);
 
         if (_castVote && _canVote(voteId, msg.sender)) {
-            _vote(voteId, true, msg.sender, _executesIfDecided);
+            _vote(voteId, true, msg.sender);
         }
     }
 
     /**
     * @dev Internal function to cast a vote. It assumes the queried vote exists.
     */
-    function _vote(uint256 _voteId, bool _supports, address _voter, bool _executesIfDecided) internal {
+    function _vote(uint256 _voteId, bool _supports, address _voter) internal {
         Vote storage vote_ = votes[_voteId];
 
         // This could re-enter, though we can assume the governance token is not malicious
@@ -314,7 +315,7 @@ contract DissentVoting is IForwarder, AragonApp {
 
         if (_supports) {
             vote_.yea = vote_.yea.add(voterStake);
-            lastYeaVoteTime[_voter] = lastYeaVoteTime[_voter] < vote_.startDate ? vote_.startDate : lastYeaVoteTime[_voter];
+            lastYeaVoteBlock[_voter] = lastYeaVoteBlock[_voter] < vote_.startBlock ? vote_.startBlock : lastYeaVoteBlock[_voter];
         } else {
             vote_.nay = vote_.nay.add(voterStake);
         }
@@ -322,11 +323,6 @@ contract DissentVoting is IForwarder, AragonApp {
         vote_.voters[_voter] = _supports ? VoterState.Yea : VoterState.Nay;
 
         emit CastVote(_voteId, _voter, _supports, voterStake);
-
-        if (_executesIfDecided && _canExecute(_voteId)) {
-            // We've already checked if the vote can be executed with `_canExecute()`
-            _unsafeExecuteVote(_voteId);
-        }
     }
 
     /**
@@ -357,27 +353,28 @@ contract DissentVoting is IForwarder, AragonApp {
     */
     function _canExecute(uint256 _voteId) internal view returns (bool) {
         Vote storage vote_ = votes[_voteId];
+        uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
+
+        if (_isVoteOpen(vote_)) {
+            return false;
+        }
 
         if (vote_.executed) {
             return false;
         }
 
         // Voting is already decided
-        if (_isValuePct(vote_.yea, vote_.votingPower, vote_.supportRequiredPct)) {
+        if (_isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.supportRequiredPct)) {
             return true;
         }
 
-        // Vote ended?
-        if (_isVoteOpen(vote_)) {
-            return false;
-        }
         // Has enough support?
         uint256 totalVotes = vote_.yea.add(vote_.nay);
         if (!_isValuePct(vote_.yea, totalVotes, vote_.supportRequiredPct)) {
             return false;
         }
         // Has min quorum?
-        if (!_isValuePct(vote_.yea, vote_.votingPower, vote_.minAcceptQuorumPct)) {
+        if (!_isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.minAcceptQuorumPct)) {
             return false;
         }
 
@@ -390,7 +387,9 @@ contract DissentVoting is IForwarder, AragonApp {
     */
     function _canVote(uint256 _voteId, address _voter) internal view returns (bool) {
         Vote storage vote_ = votes[_voteId];
-        return _isVoteOpen(vote_) && token.balanceOfAt(_voter, vote_.snapshotBlock) > 0 && _hasNotVoted(vote_, _voter);
+        uint256 balanceAtSnapshot = token.balanceOfAt(_voter, vote_.snapshotBlock);
+
+        return _isVoteOpen(vote_) && balanceAtSnapshot > 0 && _hasNotVoted(vote_, _voter);
     }
 
     /**
@@ -398,7 +397,8 @@ contract DissentVoting is IForwarder, AragonApp {
     * @return True if the given vote is open, false otherwise
     */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
-        return getTimestamp64() < vote_.startDate.add(voteTime) && !vote_.executed;
+        uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
+        return votingPowerAtSnapshot > 0 && getBlockNumber64() >= vote_.startBlock && getBlockNumber64() < vote_.startBlock.add(voteDurationBlocks);
     }
 
     /**

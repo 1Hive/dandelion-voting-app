@@ -1,22 +1,10 @@
 pragma solidity 0.4.24;
 
-import "../../DissentVoting.sol";
+import "../../DandelionVoting.sol";
 import "@aragon/test-helpers/contracts/TimeHelpersMock.sol";
 
 
-contract VotingMock is DissentVoting, TimeHelpersMock {
-    /* Ugly hack to work around this issue:
-     * https://github.com/trufflesuite/truffle/issues/569
-     * https://github.com/trufflesuite/truffle/issues/737
-     */
-    function newVoteExt(bytes _executionScript, string _metadata, bool _castVote, bool _executesIfDecided)
-        external
-        returns (uint256 voteId)
-    {
-        voteId = _newVote(_executionScript, _metadata, _castVote, _executesIfDecided);
-        emit StartVote(voteId, msg.sender, _metadata);
-    }
-
+contract VotingMock is DandelionVoting, TimeHelpersMock {
     // _isValuePct public wrapper
     function isValuePct(uint256 _value, uint256 _total, uint256 _pct) external pure returns (bool) {
         return _isValuePct(_value, _total, _pct);
@@ -30,7 +18,7 @@ contract VotingMock is DissentVoting, TimeHelpersMock {
         token.generateTokens(_holder, _tokenAmount);
 
         bytes memory noScript = new bytes(0);
-        voteId = _newVote(noScript, _metadata, false, false);
+        voteId = _newVote(noScript, _metadata, false);
         emit StartVote(voteId, msg.sender, _metadata);
     }
 }
