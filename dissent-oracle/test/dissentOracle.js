@@ -17,7 +17,6 @@ const bigExp = (x, y) => new BN(x).mul(new BN(10).pow(new BN(y)))
 const pct16 = x => bigExp(x, 16)
 const createdVoteId = receipt => getLog(receipt, 'StartVote', 'voteId')
 
-// TODO: Consider adding further integration tests with permissions with params
 contract('DissentOracle', ([appManager, voter, voter2]) => {
 
     let dissentOracle, dissentOracleBase, dandelionVoting, dandelionVotingBase, voteToken
