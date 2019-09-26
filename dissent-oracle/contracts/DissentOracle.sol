@@ -22,7 +22,7 @@ contract DissentOracle is AragonApp, IACLOracle {
 
     /**
     * @notice Initialize the DissentOracle
-    * @param _dandelionVoting Dissent voting aragon app address
+    * @param _dandelionVoting Dandelion voting aragon app address
     * @param _dissentWindowBlocks Blocks from previous yea vote the oracle will approve a function call for
     */
     function initialize(address _dandelionVoting, uint64 _dissentWindowBlocks) external onlyInit {
@@ -35,8 +35,8 @@ contract DissentOracle is AragonApp, IACLOracle {
     }
 
     /**
-    * @notice Update the dissent voting app to `_dandelionVoting`
-    * @param _dandelionVoting New dissent window
+    * @notice Update the dandelion voting app to `_dandelionVoting`
+    * @param _dandelionVoting New dandelion voting app
     */
     function setDandelionVoting(address _dandelionVoting) external auth(SET_DANDELION_VOTING_ROLE) {
         require(isContract(_dandelionVoting), ERROR_NOT_CONTRACT);
@@ -56,24 +56,18 @@ contract DissentOracle is AragonApp, IACLOracle {
 
     /**
     * @notice ACLOracle
-    * @dev IACLOracle interface conformance. If the ACLOracle permissioned function uses a forwarder and needs to
-    *      pass parameters, it should be used with the modifier 'authP(SOME_ACL_ROLE, arr(voter, dissentWindowBlocks))'
+    * @dev IACLOracle interface conformance. If the ACLOracle permissioned function should specify the dissent
+    *      window, it should use the modifier 'authP(SOME_ACL_ROLE, arr(dissentWindowBlocks))'
     */
     function canPerform(address _who, address _where, bytes32 _what, uint256[] _how) external view returns (bool) {
-
-        address voter = _who;
-        uint64 dissentWindowBlocksLocal = dissentWindowBlocks;
-
-        if (_how.length > 0) {
-            voter = address(_how[0]);
-            dissentWindowBlocksLocal = uint64(_how[1]);
-        }
+        uint64 dissentWindowBlocksLocal = _how.length > 0 ? uint64(_how[0]) : dissentWindowBlocks;
 
         // We check hasNeverVotedYea for the edge case where the chains current block number is less than the
         // dissentWindowBlocks and canPerform would return false even if "who" has not voted, when it should return true.
-        bool hasNeverVotedYea = dandelionVoting.lastYeaVoteBlock(voter) == 0;
+        bool hasNeverVotedYea = dandelionVoting.lastYeaVoteBlock(_who) == 0;
+        bool lastYeaVoteOutsideDissentWindow = dandelionVoting.lastYeaVoteBlock(_who).add(dissentWindowBlocksLocal) < getBlockNumber64();
 
-        return dandelionVoting.lastYeaVoteBlock(voter).add(dissentWindowBlocksLocal) < getBlockNumber64() || hasNeverVotedYea;
+        return hasNeverVotedYea || lastYeaVoteOutsideDissentWindow;
     }
 
 }

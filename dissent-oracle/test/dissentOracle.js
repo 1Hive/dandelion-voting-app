@@ -4,7 +4,7 @@ const MiniMeToken = artifacts.require('MiniMeToken.sol')
 
 const {deployedContract} = require("./helpers/helpers");
 const {encodeCallScript} = require("@aragon/test-helpers/evmScript")
-const {getLog} = require("./helpers/helpers")
+const {getLog, assertRevert} = require("./helpers/helpers")
 const {hash} = require('eth-ens-namehash')
 const deployDAO = require('./helpers/deployDAO')
 const BN = require('bn.js')
@@ -16,7 +16,7 @@ const bigExp = (x, y) => new BN(x).mul(new BN(10).pow(new BN(y)))
 const pct16 = x => bigExp(x, 16)
 const createdVoteId = receipt => getLog(receipt, 'StartVote', 'voteId')
 
-contract('DissentOracle', ([appManager, voter, voter2]) => {
+contract('DissentOracle', ([appManager, voter, nonContractAddress]) => {
 
     let dissentOracle, dissentOracleBase, dandelionVoting, dandelionVotingBase, voteToken
     let SET_DANDELION_VOTING_ROLE, SET_DISSENT_WINDOW_ROLE, CREATE_VOTES_ROLE
@@ -39,7 +39,7 @@ contract('DissentOracle', ([appManager, voter, voter2]) => {
         CREATE_VOTES_ROLE = await dandelionVotingBase.CREATE_VOTES_ROLE()
     })
 
-    beforeEach('deploy dao and dissentOracle', async () => {
+    beforeEach('deploy dao, dandelion voting and dissentOracle', async () => {
         const daoDeployment = await deployDAO(appManager)
         dao = daoDeployment.dao
         acl = daoDeployment.acl
@@ -85,8 +85,12 @@ contract('DissentOracle', ([appManager, voter, voter2]) => {
 
                 await dissentOracle.setDandelionVoting(newDandelionVoting.address)
 
-                const actualDissentOracle = await dissentOracle.dandelionVoting()
-                assert.strictEqual(actualDissentOracle, newDandelionVoting.address)
+                const actualDandelionVoting = await dissentOracle.dandelionVoting()
+                assert.strictEqual(actualDandelionVoting, newDandelionVoting.address)
+            })
+
+            it('reverts when dandelion voting address is not a contract', async () => {
+                await assertRevert(dissentOracle.setDandelionVoting(nonContractAddress))
             })
         })
 
@@ -137,21 +141,21 @@ contract('DissentOracle', ([appManager, voter, voter2]) => {
                 assert.isTrue(actualCanPerform)
             })
 
-            it('returns true when passed voter and dissent window in params and yea voter dissent window passed', async () => {
+            it('returns true when passed dissent window in params and yea voter dissent window passed', async () => {
                 const permissionParamsDissentWindow = DISSENT_WINDOW - 300
                 await dandelionVoting.vote(voteId, true, {from: voter})
                 await dissentOracle.mockAdvanceBlocks(permissionParamsDissentWindow)
 
-                const actualCanPerform = await dissentOracle.canPerform(ANY_ADDRESS, ANY_ADDRESS, '0x', [voter, permissionParamsDissentWindow])
+                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [permissionParamsDissentWindow])
 
                 assert.isTrue(actualCanPerform)
             })
 
-            it('returns false when passed voter and dissent window in params and within yea voter dissent window', async () => {
+            it('returns false when passed dissent window in params and within yea voter dissent window', async () => {
                 const permissionParamsDissentWindow = DISSENT_WINDOW - 300
                 await dandelionVoting.vote(voteId, true, {from: voter})
 
-                const actualCanPerform = await dissentOracle.canPerform(ANY_ADDRESS, ANY_ADDRESS, '0x', [voter, permissionParamsDissentWindow])
+                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [permissionParamsDissentWindow])
 
                 assert.isFalse(actualCanPerform)
             })
