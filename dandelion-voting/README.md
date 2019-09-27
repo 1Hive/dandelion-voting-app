@@ -3,11 +3,11 @@ The Dandelion Voting app is a fork of the Aragon Voting app with some modificati
 
 - It records the last time a voter voted in favour of a vote.
 - It removes the ability to recast votes.
-- It removes the ability to execute votes until they have ended.
+- It removes the ability to execute (and therefore finalise) votes until they have ended.
 - It adds a buffer time between votes preventing new votes from starting until the buffer time has passed.
 - Vote lengths are defined in numbers of blocks instead of time.
 
-It is expected to be used with a non-transferrable token.
+Note it is also expected to be used with a non-transferrable token.
 
 
 ### Running tests
