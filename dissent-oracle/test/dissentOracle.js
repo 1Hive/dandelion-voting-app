@@ -140,25 +140,6 @@ contract('DissentOracle', ([appManager, voter, nonContractAddress]) => {
                 const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [])
                 assert.isTrue(actualCanPerform)
             })
-
-            it('returns true when passed dissent window in params and yea voter dissent window passed', async () => {
-                const permissionParamsDissentWindow = DISSENT_WINDOW - 300
-                await dandelionVoting.vote(voteId, true, {from: voter})
-                await dissentOracle.mockAdvanceBlocks(permissionParamsDissentWindow)
-
-                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [permissionParamsDissentWindow])
-
-                assert.isTrue(actualCanPerform)
-            })
-
-            it('returns false when passed dissent window in params and within yea voter dissent window', async () => {
-                const permissionParamsDissentWindow = DISSENT_WINDOW - 300
-                await dandelionVoting.vote(voteId, true, {from: voter})
-
-                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [permissionParamsDissentWindow])
-
-                assert.isFalse(actualCanPerform)
-            })
         })
     })
 })

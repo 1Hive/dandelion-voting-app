@@ -56,16 +56,14 @@ contract DissentOracle is AragonApp, IACLOracle {
 
     /**
     * @notice ACLOracle
-    * @dev IACLOracle interface conformance. If the ACLOracle permissioned function should specify the dissent
-    *      window, it should use the modifier 'authP(SOME_ACL_ROLE, arr(dissentWindowBlocks))'
+    * @dev IACLOracle interface conformance.
     */
     function canPerform(address _who, address _where, bytes32 _what, uint256[] _how) external view returns (bool) {
-        uint64 dissentWindowBlocksLocal = _how.length > 0 ? uint64(_how[0]) : dissentWindowBlocks;
-
         // We check hasNeverVotedYea for the edge case where the chains current block number is less than the
         // dissentWindowBlocks and canPerform would return false even if "who" has not voted, when it should return true.
         bool hasNeverVotedYea = dandelionVoting.lastYeaVoteBlock(_who) == 0;
-        bool lastYeaVoteOutsideDissentWindow = dandelionVoting.lastYeaVoteBlock(_who).add(dissentWindowBlocksLocal) < getBlockNumber64();
+
+        bool lastYeaVoteOutsideDissentWindow = dandelionVoting.lastYeaVoteBlock(_who).add(dissentWindowBlocks) < getBlockNumber64();
 
         return hasNeverVotedYea || lastYeaVoteOutsideDissentWindow;
     }
