@@ -56,14 +56,17 @@ contract DissentOracle is AragonApp, IACLOracle {
 
     /**
     * @notice ACLOracle
-    * @dev IACLOracle interface conformance.
+    * @dev IACLOracle interface conformance. The ACLOracle permissioned function should specify the sender
+    *      with 'authP(SOME_ACL_ROLE, arr(sender))', where sender is typically set to 'msg.sender'.
     */
     function canPerform(address _who, address _where, bytes32 _what, uint256[] _how) external view returns (bool) {
+
+        address sender = _how.length > 0 ? address(_how[0]) : _who;
+
         // We check hasNeverVotedYea for the edge case where the chains current block number is less than the
         // dissentWindowBlocks and canPerform would return false even if "who" has not voted, when it should return true.
-        bool hasNeverVotedYea = dandelionVoting.lastYeaVoteBlock(_who) == 0;
-
-        bool lastYeaVoteOutsideDissentWindow = dandelionVoting.lastYeaVoteBlock(_who).add(dissentWindowBlocks) < getBlockNumber64();
+        bool hasNeverVotedYea = dandelionVoting.lastYeaVoteBlock(sender) == 0;
+        bool lastYeaVoteOutsideDissentWindow = dandelionVoting.lastYeaVoteBlock(sender).add(dissentWindowBlocks) < getBlockNumber64();
 
         return hasNeverVotedYea || lastYeaVoteOutsideDissentWindow;
     }

@@ -2,10 +2,10 @@ const DissentOracle = artifacts.require('DissentOracleMock.sol')
 const DandelionVoting = artifacts.require('VotingMock.sol')
 const MiniMeToken = artifacts.require('MiniMeToken.sol')
 
-const {deployedContract} = require("./helpers/helpers");
-const {encodeCallScript} = require("@aragon/test-helpers/evmScript")
-const {getLog, assertRevert} = require("./helpers/helpers")
-const {hash} = require('eth-ens-namehash')
+const { deployedContract } = require('./helpers/helpers')
+const { encodeCallScript } = require('@aragon/test-helpers/evmScript')
+const { getLog, assertRevert } = require('./helpers/helpers')
+const { hash } = require('eth-ens-namehash')
 const deployDAO = require('./helpers/deployDAO')
 const BN = require('bn.js')
 
@@ -16,7 +16,7 @@ const bigExp = (x, y) => new BN(x).mul(new BN(10).pow(new BN(y)))
 const pct16 = x => bigExp(x, 16)
 const createdVoteId = receipt => getLog(receipt, 'StartVote', 'voteId')
 
-contract('DissentOracle', ([appManager, voter, nonContractAddress]) => {
+contract('DissentOracle', ([appManager, voterVoteYea, voterVoteNo, nonContractAddress]) => {
 
     let dissentOracle, dissentOracleBase, dandelionVoting, dandelionVotingBase, voteToken
     let SET_DANDELION_VOTING_ROLE, SET_DISSENT_WINDOW_ROLE, CREATE_VOTES_ROLE
@@ -47,21 +47,21 @@ contract('DissentOracle', ([appManager, voter, nonContractAddress]) => {
         voteToken = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'n', VOTE_TOKEN_DECIMALS, 'n', true)
 
         const newDandelionVotingReceipt = await dao.newAppInstance(
-            hash('dandelion-voting.aragonpm.test'), dandelionVotingBase.address, '0x', false, {from: appManager})
+            hash('dandelion-voting.aragonpm.test'), dandelionVotingBase.address, '0x', false, { from: appManager })
         dandelionVoting = await DandelionVoting.at(deployedContract(newDandelionVotingReceipt))
 
         const newDissentOracleReceipt = await dao.newAppInstance(
-            hash('dissent-oracle.aragonpm.test'), dissentOracleBase.address, '0x', false, {from: appManager})
+            hash('dissent-oracle.aragonpm.test'), dissentOracleBase.address, '0x', false, { from: appManager })
         dissentOracle = await DissentOracle.at(deployedContract(newDissentOracleReceipt))
 
-        await acl.createPermission(appManager, dissentOracle.address, SET_DISSENT_WINDOW_ROLE, appManager, {from: appManager})
-        await acl.createPermission(appManager, dissentOracle.address, SET_DANDELION_VOTING_ROLE, appManager, {from: appManager})
-        await acl.createPermission(ANY_ADDRESS, dandelionVoting.address, CREATE_VOTES_ROLE, appManager, {from: appManager})
+        await acl.createPermission(appManager, dissentOracle.address, SET_DISSENT_WINDOW_ROLE, appManager, { from: appManager })
+        await acl.createPermission(appManager, dissentOracle.address, SET_DANDELION_VOTING_ROLE, appManager, { from: appManager })
+        await acl.createPermission(ANY_ADDRESS, dandelionVoting.address, CREATE_VOTES_ROLE, appManager, { from: appManager })
 
         await dandelionVoting.initialize(voteToken.address, neededSupport, minimumAcceptanceQuorum, voteDurationBlocks, voteBufferBlocks)
     })
 
-    describe("initialize(address _dandelionVoting, uint64 _dissentWindowBlocks)", async () => {
+    describe('initialize(address _dandelionVoting, uint64 _dissentWindowBlocks)', async () => {
 
         beforeEach(async () => {
             await dissentOracle.initialize(dandelionVoting.address, DISSENT_WINDOW)
@@ -80,7 +80,7 @@ contract('DissentOracle', ([appManager, voter, nonContractAddress]) => {
 
             it('sets a new dandelion voting app', async () => {
                 const newDandelionVotingReceipt = await dao.newAppInstance(
-                    hash('dandelion-voting.aragonpm.test'), dandelionVotingBase.address, '0x', false, {from: appManager})
+                    hash('dandelion-voting.aragonpm.test'), dandelionVotingBase.address, '0x', false, { from: appManager })
                 const newDandelionVoting = await DandelionVoting.at(deployedContract(newDandelionVotingReceipt))
 
                 await dissentOracle.setDandelionVoting(newDandelionVoting.address)
@@ -111,33 +111,56 @@ contract('DissentOracle', ([appManager, voter, nonContractAddress]) => {
             let voteId
 
             beforeEach(async () => {
-                await voteToken.generateTokens(voter, bigExp(20, VOTE_TOKEN_DECIMALS))
-                voteId = createdVoteId(await dandelionVoting.newVote(encodeCallScript([]), '', false), {from: appManager})
+                await voteToken.generateTokens(voterVoteYea, bigExp(20, VOTE_TOKEN_DECIMALS))
+                await voteToken.generateTokens(voterVoteNo, bigExp(20, VOTE_TOKEN_DECIMALS))
+
+                voteId = createdVoteId(await dandelionVoting.newVote(encodeCallScript([]), '', false), { from: appManager })
+
+                await dandelionVoting.vote(voteId, true, { from: voterVoteYea })
+                await dandelionVoting.vote(voteId, false, { from: voterVoteNo })
             })
 
             it('returns true when voted yea and dissent window passed', async () => {
-                await dandelionVoting.vote(voteId, true, {from: voter})
                 await dissentOracle.mockAdvanceBlocks(DISSENT_WINDOW)
-                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [])
+                const actualCanPerform = await dissentOracle.canPerform(voterVoteYea, ANY_ADDRESS, '0x', [])
                 assert.isTrue(actualCanPerform)
             })
 
             it('returns false when voted yea and before end of dissent window', async () => {
-                await dandelionVoting.vote(voteId, true, {from: voter})
-                await dissentOracle.mockAdvanceBlocks(DISSENT_WINDOW - 2)
-                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [])
+                await dissentOracle.mockAdvanceBlocks(DISSENT_WINDOW - 3)
+                const actualCanPerform = await dissentOracle.canPerform(voterVoteYea, ANY_ADDRESS, '0x', [])
                 assert.isFalse(actualCanPerform)
             })
 
             it('returns false when voted yea within dissent window', async () => {
-                await dandelionVoting.vote(voteId, true, {from: voter})
-                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [])
+                const actualCanPerform = await dissentOracle.canPerform(voterVoteYea, ANY_ADDRESS, '0x', [])
                 assert.isFalse(actualCanPerform)
             })
 
             it('returns true when voted no but within dissent window', async () => {
-                await dandelionVoting.vote(voteId, false, {from: voter})
-                const actualCanPerform = await dissentOracle.canPerform(voter, ANY_ADDRESS, '0x', [])
+                const actualCanPerform = await dissentOracle.canPerform(voterVoteNo, ANY_ADDRESS, '0x', [])
+                assert.isTrue(actualCanPerform)
+            })
+
+            it('returns true when voted yea, dissent window passed and address passed as param', async () => {
+                await dissentOracle.mockAdvanceBlocks(DISSENT_WINDOW)
+                const actualCanPerform = await dissentOracle.canPerform(ANY_ADDRESS, ANY_ADDRESS, '0x', [voterVoteYea])
+                assert.isTrue(actualCanPerform)
+            })
+
+            it('returns false when voted yea, before end of dissent window and address passed as param', async () => {
+                await dissentOracle.mockAdvanceBlocks(DISSENT_WINDOW - 3)
+                const actualCanPerform = await dissentOracle.canPerform(ANY_ADDRESS, ANY_ADDRESS, '0x', [voterVoteYea])
+                assert.isFalse(actualCanPerform)
+            })
+
+            it('returns false when voted yea within dissent window and address passed as param', async () => {
+                const actualCanPerform = await dissentOracle.canPerform(ANY_ADDRESS, ANY_ADDRESS, '0x', [voterVoteYea])
+                assert.isFalse(actualCanPerform)
+            })
+
+            it('returns true when voted no but within dissent window and address passed as param', async () => {
+                const actualCanPerform = await dissentOracle.canPerform(ANY_ADDRESS, ANY_ADDRESS, '0x', [voterVoteNo])
                 assert.isTrue(actualCanPerform)
             })
         })
