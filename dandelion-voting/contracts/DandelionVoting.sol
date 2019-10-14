@@ -250,6 +250,7 @@ contract DandelionVoting is IForwarder, AragonApp {
             uint64 snapshotBlock,
             uint64 supportRequired,
             uint64 minAcceptQuorum,
+            uint256 votingPower,
             uint256 yea,
             uint256 nay,
             bytes script
@@ -261,6 +262,7 @@ contract DandelionVoting is IForwarder, AragonApp {
         executed = vote_.executed;
         startBlock = vote_.startBlock;
         snapshotBlock = vote_.snapshotBlock;
+        votingPower = token.totalSupplyAt(vote_.snapshotBlock);
         supportRequired = vote_.supportRequiredPct;
         minAcceptQuorum = vote_.minAcceptQuorumPct;
         yea = vote_.yea;

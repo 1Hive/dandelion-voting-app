@@ -1,4 +1,4 @@
-import { isBefore } from 'date-fns'
+import { isBefore } from "date-fns";
 import {
   VOTE_ABSENT,
   VOTE_YEA,
@@ -7,50 +7,58 @@ import {
   VOTE_STATUS_REJECTED,
   VOTE_STATUS_ACCEPTED,
   VOTE_STATUS_PENDING_ENACTMENT,
-  VOTE_STATUS_ENACTED,
-} from './vote-types'
+  VOTE_STATUS_ENACTED
+} from "./vote-types";
 
-const EMPTY_SCRIPT = '0x00000001'
+const EMPTY_SCRIPT = "0x00000001";
 
 export function isVoteAction(vote) {
-  return vote.data && vote.data.script && vote.data.script !== EMPTY_SCRIPT
+  return vote.data && vote.data.script && vote.data.script !== EMPTY_SCRIPT;
 }
 
-export function isVoteOpen(vote, date) {
-  const { executed, endDate } = vote.data
+export function isVotePending(vote, currentBlockNumber) {
+  const { snapshotBlock } = vote.data;
+
+  return currentBlockNumber <= snapshotBlock;
+}
+
+export function isVoteOpen(vote, currentBlockNumber) {
+  const { executed, endBlock, snapshotBlock } = vote.data;
   // Open if not executed and date is still before end date
-  return !executed && isBefore(date, endDate)
+  const isBetweeen =
+    snapshotBlock < currentBlockNumber && currentBlockNumber < endBlock;
+  return !executed && isBetweeen;
 }
 
 export const getQuorumProgress = ({ numData: { yea, votingPower } }) =>
-  yea / votingPower
+  yea / votingPower;
 
 export function getVoteStatus(vote, pctBase) {
   if (vote.data.open) {
-    return VOTE_STATUS_ONGOING
+    return VOTE_STATUS_ONGOING;
   }
   if (!getVoteSuccess(vote, pctBase)) {
-    return VOTE_STATUS_REJECTED
+    return VOTE_STATUS_REJECTED;
   }
 
   // Only if the vote has an action do we consider it possible for enactment
-  const hasAction = isVoteAction(vote)
+  const hasAction = isVoteAction(vote);
   return hasAction
     ? vote.data.executed
       ? VOTE_STATUS_ENACTED
       : VOTE_STATUS_PENDING_ENACTMENT
-    : VOTE_STATUS_ACCEPTED
+    : VOTE_STATUS_ACCEPTED;
 }
 
 export function getVoteSuccess(vote, pctBase) {
-  const { yea, minAcceptQuorum, nay, supportRequired, votingPower } = vote.data
+  const { yea, minAcceptQuorum, nay, supportRequired, votingPower } = vote.data;
 
-  const totalVotes = yea.add(nay)
+  const totalVotes = yea.add(nay);
   if (totalVotes.isZero()) {
-    return false
+    return false;
   }
-  const yeaPct = yea.mul(pctBase).div(totalVotes)
-  const yeaOfTotalPowerPct = yea.mul(pctBase).div(votingPower)
+  const yeaPct = yea.mul(pctBase).div(totalVotes);
+  const yeaOfTotalPowerPct = yea.mul(pctBase).div(votingPower);
 
   // Mirror on-chain calculation
   // yea / votingPower > supportRequired ||
@@ -59,37 +67,37 @@ export function getVoteSuccess(vote, pctBase) {
   return (
     yeaOfTotalPowerPct.gt(supportRequired) ||
     (yeaPct.gt(supportRequired) && yeaOfTotalPowerPct.gt(minAcceptQuorum))
-  )
+  );
 }
 
 // Enums are not supported by the ABI yet:
 // https://solidity.readthedocs.io/en/latest/frequently-asked-questions.html#if-i-return-an-enum-i-only-get-integer-values-in-web3-js-how-to-get-the-named-values
 export function voteTypeFromContractEnum(value) {
-  if (value === '1') {
-    return VOTE_YEA
+  if (value === "1") {
+    return VOTE_YEA;
   }
-  if (value === '2') {
-    return VOTE_NAY
+  if (value === "2") {
+    return VOTE_NAY;
   }
-  return VOTE_ABSENT
+  return VOTE_ABSENT;
 }
 
 export async function getCanVote(vote, connectedAccount, api) {
   if (!vote) {
-    return false
+    return false;
   }
 
   // If the account is not present, we assume the account is not connected.
   if (!connectedAccount) {
-    return vote.data.open
+    return vote.data.open;
   }
 
-  return api.call('canVote', vote.voteId, connectedAccount).toPromise()
+  return api.call("canVote", vote.voteId, connectedAccount).toPromise();
 }
 
 export async function getCanExecute(vote, api) {
   if (!vote) {
-    return false
+    return false;
   }
-  return api.call('canExecute', vote.voteId).toPromise()
+  return api.call("canExecute", vote.voteId).toPromise();
 }

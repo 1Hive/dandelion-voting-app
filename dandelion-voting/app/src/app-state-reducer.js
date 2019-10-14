@@ -1,24 +1,27 @@
-import BN from 'bn.js'
-import { hasLoadedVoteSettings } from './vote-settings'
+import BN from "bn.js";
+import { hasLoadedVoteSettings } from "./vote-settings";
 
 function appStateReducer(state) {
-  const ready = hasLoadedVoteSettings(state)
+  const ready = hasLoadedVoteSettings(state);
+  const getEstimatedEndDate = (startDate, voteDurationBlocks) => {
+    return new Date(startDate + voteDurationBlocks * 8000);
+  };
 
   if (!ready) {
-    return { ...state, ready }
+    return { ...state, ready };
   }
 
   const {
     pctBase,
     tokenDecimals,
-    voteTime,
+    voteDurationBlocks,
     votes,
-    connectedAccountVotes,
-  } = state
+    connectedAccountVotes
+  } = state;
 
-  const pctBaseNum = parseInt(pctBase, 10)
-  const tokenDecimalsNum = parseInt(tokenDecimals, 10)
-  const tokenDecimalsBaseNum = Math.pow(10, tokenDecimalsNum)
+  const pctBaseNum = parseInt(pctBase, 10);
+  const tokenDecimalsNum = parseInt(tokenDecimals, 10);
+  const tokenDecimalsBaseNum = Math.pow(10, tokenDecimalsNum);
 
   return {
     ...state,
@@ -29,7 +32,7 @@ function appStateReducer(state) {
 
     numData: {
       pctBase: pctBaseNum,
-      tokenDecimals: tokenDecimalsNum,
+      tokenDecimals: tokenDecimalsNum
     },
 
     connectedAccountVotes: connectedAccountVotes || {},
@@ -37,19 +40,22 @@ function appStateReducer(state) {
     // Transform the vote data for the frontend
     votes: votes
       ? votes.map(vote => {
-          const { data } = vote
+          const { data } = vote;
           return {
             ...vote,
             data: {
               ...data,
               executionDate: data.executionDate && new Date(data.executionDate),
-              endDate: new Date(data.startDate + voteTime),
+              // endDate: getEstimatedEndDate(data.startDate, voteDurationBlocks),
+              endBlock:
+                parseInt(data.startBlock, 10) +
+                parseInt(voteDurationBlocks, 10),
               minAcceptQuorum: new BN(data.minAcceptQuorum),
               nay: new BN(data.nay),
-              startDate: new Date(data.startDate),
+              // startDate: new Date(data.startDate),
               supportRequired: new BN(data.supportRequired),
               votingPower: new BN(data.votingPower),
-              yea: new BN(data.yea),
+              yea: new BN(data.yea)
             },
             numData: {
               minAcceptQuorum: parseInt(data.minAcceptQuorum, 10) / pctBaseNum,
@@ -57,12 +63,12 @@ function appStateReducer(state) {
               supportRequired: parseInt(data.supportRequired, 10) / pctBaseNum,
               votingPower:
                 parseInt(data.votingPower, 10) / tokenDecimalsBaseNum,
-              yea: parseInt(data.yea, 10) / tokenDecimalsBaseNum,
-            },
-          }
+              yea: parseInt(data.yea, 10) / tokenDecimalsBaseNum
+            }
+          };
         })
-      : [],
-  }
+      : []
+  };
 }
 
-export default appStateReducer
+export default appStateReducer;
