@@ -16,6 +16,12 @@ function getVoteExecutionTargets(vote) {
   return vote.data.executionTargets || [];
 }
 
+async function loadBlockTimestamp(blockNumber, api) {
+  const { timestamp } = await api.web3Eth("getBlock", blockNumber).toPromise();
+  // Adjust for solidity time (s => ms)
+  return timestamp * 1000;
+}
+
 // Decorate the votes array with more information relevant to the frontend
 function useDecoratedVotes() {
   const { votes, connectedAccountVotes } = useAppState();
@@ -97,6 +103,7 @@ function useDecoratedVotes() {
 export default function useVotes(api) {
   const [votes, executionTargets] = useDecoratedVotes();
   const [blockNumber, setBlockNumber] = useState();
+  const [votesTimestamps, setVotesTimestamps] = useState(new Map());
   const now = useNow();
 
   useEffect(() => {
@@ -107,12 +114,23 @@ export default function useVotes(api) {
     fetchBlockNumber();
   }, [api, now]);
 
-  //console.log("blockNumber ", blockNumber);
+  useEffect(() => {
+    const getTimeStamps = async () => {
+      await Promise.all(votes.map(vote => setTimeStamps(vote, api)));
+    };
+    getTimeStamps();
+  }, [api, votes, blockNumber]);
+
+  const setTimeStamps = async (vote, api) => {
+    const timestamp = await loadBlockTimestamp(vote.data.startBlock, api);
+    setVotesTimestamps(votesTimestamps.set(vote.voteId, timestamp));
+  };
 
   const openedStates = votes.map(v => isVoteOpen(v, blockNumber));
   const pendingToStartStates = votes.map(v => isVotePending(v, blockNumber));
   const openedStatesKey = openedStates.join("");
   const pendingStatesKey = pendingToStartStates.join("");
+  const votesTimeStampsKey = JSON.stringify([...votesTimestamps]);
 
   return [
     useMemo(() => {
@@ -121,10 +139,11 @@ export default function useVotes(api) {
         data: {
           ...vote.data,
           open: openedStates[i],
-          pendingToStart: pendingToStartStates[i]
+          pending: pendingToStartStates[i],
+          startDate: votesTimestamps.get(vote.voteId) || null
         }
       }));
-    }, [votes, openedStatesKey, pendingStatesKey]), // eslint-disable-line react-hooks/exhaustive-deps
+    }, [votes, votesTimeStampsKey, openedStatesKey, pendingStatesKey]), // eslint-disable-line react-hooks/exhaustive-deps
     executionTargets
   ];
 }

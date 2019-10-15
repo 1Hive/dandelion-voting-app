@@ -78,6 +78,7 @@ export function useAppLogic() {
   const { isSyncing, ready } = useAppState();
   const api = useApi();
   const [votes, executionTargets] = useVotes(api);
+  console.log("APPLOGIC ", votes);
   const [selectedVote, selectVote] = useSelectedVote(votes);
   const newVotePanel = usePanelState();
 
