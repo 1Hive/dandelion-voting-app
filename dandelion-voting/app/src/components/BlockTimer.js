@@ -25,7 +25,7 @@ const BlockTimer = ({ vote, endDate }) => {
           display: block;
         `}
       >
-        {pending ? `Blocks to start: ` : `Blocks duration: `} {remainingBlocks}
+        {pending ? `Starts in: ` : `Ends in: `} {remainingBlocks}
       </span>
       {!pending && (
         <div
