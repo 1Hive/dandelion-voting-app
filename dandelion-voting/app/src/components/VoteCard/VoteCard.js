@@ -1,25 +1,32 @@
-import React, { useCallback, useMemo } from 'react'
-import styled from 'styled-components'
-import { Card, GU, IconCheck, Timer, textStyle, useTheme } from '@aragon/ui'
-import { noop } from '../../utils'
-import { VOTE_YEA, VOTE_NAY } from '../../vote-types'
-import LocalLabelAppBadge from '..//LocalIdentityBadge/LocalLabelAppBadge'
-import VoteOptions from './VoteOptions'
-import VoteStatus from '../VoteStatus'
-import VoteText from '../VoteText'
-import You from '../You'
+import React, { useCallback, useMemo } from "react";
+import styled from "styled-components";
+import { Card, GU, IconCheck, textStyle, useTheme } from "@aragon/ui";
+import { noop } from "../../utils";
+import { VOTE_YEA, VOTE_NAY } from "../../vote-types";
+import LocalLabelAppBadge from "..//LocalIdentityBadge/LocalLabelAppBadge";
+import VoteOptions from "./VoteOptions";
+import VoteStatus from "../VoteStatus";
+import VoteText from "../VoteText";
+import You from "../You";
+import BlockTimer from "../BlockTimer";
+import { useAppState } from "@aragon/api-react";
+import useBlockTime from "../../hooks/useBlockTime";
 
 const VoteCard = ({ vote, onOpen }) => {
-  const theme = useTheme()
+  const { voteDurationBlocks } = useAppState();
+  const blockTime = useBlockTime();
+  const theme = useTheme();
   const {
     connectedAccountVote,
     data,
     executionTargetData,
     numData,
-    voteId,
-  } = vote
-  const { votingPower, yea, nay } = numData
-  const { open, metadata, description, endDate } = data
+    voteId
+  } = vote;
+  const { votingPower, yea, nay } = numData;
+  const { open, metadata, description, startDate, pending } = data;
+  const endDate = new Date(startDate + voteDurationBlocks * blockTime * 1000);
+
   const options = useMemo(
     () => [
       {
@@ -29,7 +36,7 @@ const VoteCard = ({ vote, onOpen }) => {
             {connectedAccountVote === VOTE_YEA && <You />}
           </WrapVoteOption>
         ),
-        power: yea,
+        power: yea
       },
       {
         label: (
@@ -39,16 +46,16 @@ const VoteCard = ({ vote, onOpen }) => {
           </WrapVoteOption>
         ),
         power: nay,
-        color: theme.negative,
-      },
+        color: theme.negative
+      }
     ],
     [yea, nay, theme, connectedAccountVote]
-  )
+  );
   const youVoted =
-    connectedAccountVote === VOTE_YEA || connectedAccountVote === VOTE_NAY
+    connectedAccountVote === VOTE_YEA || connectedAccountVote === VOTE_NAY;
   const handleOpen = useCallback(() => {
-    onOpen(voteId)
-  }, [voteId, onOpen])
+    onOpen(voteId);
+  }, [voteId, onOpen]);
 
   return (
     <Card
@@ -94,7 +101,7 @@ const VoteCard = ({ vote, onOpen }) => {
       </div>
       <div
         css={`
-          ${textStyle('body1')};
+          ${textStyle("body1")};
           /* lines per font size per line height */
           /* shorter texts align to the top */
           height: 84px;
@@ -104,7 +111,7 @@ const VoteCard = ({ vote, onOpen }) => {
           overflow: hidden;
         `}
       >
-        <span css="font-weight: bold;">#{voteId}:</span>{' '}
+        <span css="font-weight: bold;">#{voteId}:</span>{" "}
         <VoteText disabled text={description || metadata} />
       </div>
       <VoteOptions options={options} votingPower={votingPower} />
@@ -113,25 +120,27 @@ const VoteCard = ({ vote, onOpen }) => {
           margin-top: ${2 * GU}px;
         `}
       >
-        {open ? (
-          <Timer end={endDate} maxUnits={4} />
+        {open || pending ? (
+          <BlockTimer vote={vote} endDate={endDate} />
         ) : (
+          /* <Timer end={endDate} maxUnits={4} /> */
+
           <VoteStatus vote={vote} />
         )}
       </div>
     </Card>
-  )
-}
+  );
+};
 
 VoteCard.defaultProps = {
-  onOpen: noop,
-}
+  onOpen: noop
+};
 
 const WrapVoteOption = styled.span`
   display: flex;
   align-items: center;
   text-transform: uppercase;
-  ${textStyle('label2')};
-`
+  ${textStyle("label2")};
+`;
 
-export default VoteCard
+export default VoteCard;

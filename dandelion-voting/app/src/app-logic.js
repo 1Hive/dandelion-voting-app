@@ -6,6 +6,7 @@ import usePanelState from "./hooks/usePanelState";
 import useVotes from "./hooks/useVotes";
 import { noop } from "./utils";
 import { VOTE_YEA } from "./vote-types";
+import useBlockTime from "./hooks/useBlockTime";
 
 // Get the vote currently selected, or null otherwise.
 export function useSelectedVote(votes) {
@@ -76,11 +77,12 @@ export function useExecuteAction(onDone = noop) {
 // Handles the main logic of the app.
 export function useAppLogic() {
   const { isSyncing, ready } = useAppState();
-  const api = useApi();
-  const [votes, executionTargets] = useVotes(api);
+  const [votes, executionTargets] = useVotes();
   console.log("APPLOGIC ", votes);
   const [selectedVote, selectVote] = useSelectedVote(votes);
   const newVotePanel = usePanelState();
+  const blockTime = useBlockTime();
+  console.log("useBlockTime ", blockTime);
 
   const actions = {
     createVote: useCreateVoteAction(newVotePanel.requestClose),

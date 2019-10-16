@@ -8,7 +8,7 @@ import {
 import { isVoteOpen, isVotePending } from "../vote-utils";
 import { VOTE_ABSENT } from "../vote-types";
 import { EMPTY_ADDRESS } from "../web3-utils";
-import useNow from "./useNow";
+import useBlockNumber from "./useBlockNumber";
 
 // Temporary fix to make sure executionTargets always returns an array, until
 // we find out the reason why it can sometimes be missing in the cached data.
@@ -100,19 +100,11 @@ function useDecoratedVotes() {
 }
 
 // Get the votes array ready to be used in the app.
-export default function useVotes(api) {
+export default function useVotes() {
   const [votes, executionTargets] = useDecoratedVotes();
-  const [blockNumber, setBlockNumber] = useState();
   const [votesTimestamps, setVotesTimestamps] = useState(new Map());
-  const now = useNow();
-
-  useEffect(() => {
-    const fetchBlockNumber = async () => {
-      const result = api && (await api.web3Eth("getBlockNumber").toPromise());
-      setBlockNumber(result);
-    };
-    fetchBlockNumber();
-  }, [api, now]);
+  const blockNumber = useBlockNumber();
+  const api = useApi();
 
   useEffect(() => {
     const getTimeStamps = async () => {

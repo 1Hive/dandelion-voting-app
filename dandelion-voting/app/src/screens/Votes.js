@@ -182,8 +182,8 @@ const VoteGroups = React.memo(
   ({ openVotes, pendingVotes, closedVotes, onSelectVote }) => {
     const voteGroups = [
       ["Open votes", openVotes],
-      ["Closed votes", closedVotes],
-      ["Pending votes", pendingVotes]
+      ["Upcoming votes", pendingVotes],
+      ["Closed votes", closedVotes]
     ];
 
     return (
