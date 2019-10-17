@@ -1,6 +1,15 @@
 import React, { useCallback, useMemo } from "react";
 import styled from "styled-components";
-import { Card, GU, IconCheck, textStyle, useTheme } from "@aragon/ui";
+import {
+  Card,
+  GU,
+  IconCheck,
+  textStyle,
+  useTheme,
+  Timer,
+  IconInfo,
+  Help
+} from "@aragon/ui";
 import { noop } from "../../utils";
 import { VOTE_YEA, VOTE_NAY } from "../../vote-types";
 import LocalLabelAppBadge from "..//LocalIdentityBadge/LocalLabelAppBadge";
@@ -8,7 +17,7 @@ import VoteOptions from "./VoteOptions";
 import VoteStatus from "../VoteStatus";
 import VoteText from "../VoteText";
 import You from "../You";
-import BlockTimer from "../BlockTimer";
+import BlockTimerHelper from "../BlockTimerHelper";
 import { useAppState } from "@aragon/api-react";
 import useBlockTime from "../../hooks/useBlockTime";
 
@@ -121,10 +130,17 @@ const VoteCard = ({ vote, onOpen }) => {
         `}
       >
         {open || pending ? (
-          <BlockTimer vote={vote} endDate={endDate} />
-        ) : (
-          /* <Timer end={endDate} maxUnits={4} /> */
+          <div
+            css={`
+              display: flex;
+              justify-content: space-between;
+            `}
+          >
+            {endDate && <Timer end={endDate} maxUnits={4} />}
 
+            <BlockTimerHelper vote={vote} blockTime={blockTime} />
+          </div>
+        ) : (
           <VoteStatus vote={vote} />
         )}
       </div>

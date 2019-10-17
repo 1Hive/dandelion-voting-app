@@ -7,7 +7,7 @@ import {
 } from "@aragon/api-react";
 import { isVoteOpen, isVotePending } from "../vote-utils";
 import { VOTE_ABSENT } from "../vote-types";
-import { EMPTY_ADDRESS } from "../web3-utils";
+import { EMPTY_ADDRESS, loadBlockTimestamp } from "../web3-utils";
 import useBlockNumber from "./useBlockNumber";
 
 // Temporary fix to make sure executionTargets always returns an array, until
@@ -16,17 +16,12 @@ function getVoteExecutionTargets(vote) {
   return vote.data.executionTargets || [];
 }
 
-async function loadBlockTimestamp(blockNumber, api) {
-  const { timestamp } = await api.web3Eth("getBlock", blockNumber).toPromise();
-  // Adjust for solidity time (s => ms)
-  return timestamp * 1000;
-}
-
 // Decorate the votes array with more information relevant to the frontend
 function useDecoratedVotes() {
   const { votes, connectedAccountVotes } = useAppState();
   const currentApp = useCurrentApp();
   const installedApps = useInstalledApps();
+  console.log("Installed apps ", installedApps);
 
   return useMemo(() => {
     if (!votes) {
@@ -102,7 +97,8 @@ function useDecoratedVotes() {
 // Get the votes array ready to be used in the app.
 export default function useVotes() {
   const [votes, executionTargets] = useDecoratedVotes();
-  const [votesTimestamps, setVotesTimestamps] = useState(new Map());
+  const [votesStartTimestamps, setVotesStartTimestamps] = useState(new Map());
+  const [votesEndTimestamps, setVotesEndTimestamps] = useState(new Map());
   const blockNumber = useBlockNumber();
   const api = useApi();
 
@@ -114,15 +110,28 @@ export default function useVotes() {
   }, [api, votes, blockNumber]);
 
   const setTimeStamps = async (vote, api) => {
-    const timestamp = await loadBlockTimestamp(vote.data.startBlock, api);
-    setVotesTimestamps(votesTimestamps.set(vote.voteId, timestamp));
+    if (blockNumber >= vote.data.startBlock) {
+      const startTimestamp = await loadBlockTimestamp(
+        vote.data.startBlock,
+        api
+      );
+      setVotesStartTimestamps(
+        votesStartTimestamps.set(vote.voteId, startTimestamp)
+      );
+    }
+
+    if (blockNumber >= vote.data.endBlock) {
+      const endTimestamp = await loadBlockTimestamp(vote.data.endBlock, api);
+      setVotesEndTimestamps(votesEndTimestamps.set(vote.voteId, endTimestamp));
+    }
   };
 
   const openedStates = votes.map(v => isVoteOpen(v, blockNumber));
   const pendingToStartStates = votes.map(v => isVotePending(v, blockNumber));
   const openedStatesKey = openedStates.join("");
   const pendingStatesKey = pendingToStartStates.join("");
-  const votesTimeStampsKey = JSON.stringify([...votesTimestamps]);
+  const votesStartTimeStampsKey = JSON.stringify([...votesStartTimestamps]);
+  const votesEndTimeStampsKey = JSON.stringify([...votesEndTimestamps]);
 
   return [
     useMemo(() => {
@@ -132,10 +141,17 @@ export default function useVotes() {
           ...vote.data,
           open: openedStates[i],
           pending: pendingToStartStates[i],
-          startDate: votesTimestamps.get(vote.voteId) || null
+          startDate: votesStartTimestamps.get(vote.voteId) || null,
+          endDate: votesEndTimestamps.get(vote.voteId) || null
         }
       }));
-    }, [votes, votesTimeStampsKey, openedStatesKey, pendingStatesKey]), // eslint-disable-line react-hooks/exhaustive-deps
+    }, [
+      votes,
+      votesStartTimeStampsKey,
+      votesEndTimeStampsKey,
+      openedStatesKey,
+      pendingStatesKey
+    ]), // eslint-disable-line react-hooks/exhaustive-deps
     executionTargets
   ];
 }

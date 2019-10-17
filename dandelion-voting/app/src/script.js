@@ -304,14 +304,14 @@ async function loadVoterState({ connectedAccount, voteId }) {
 async function loadVoteDescription(vote) {
   vote.description = "";
   vote.executionTargets = [];
-
+  console.log("loadVoteDescription vote ", vote);
   if (!vote.script || vote.script === EMPTY_CALLSCRIPT) {
     return vote;
   }
 
   try {
     const path = await app.describeScript(vote.script).toPromise();
-
+    console.log("loadVoteDescription path ", path);
     // Get unique list of targets
     vote.executionTargets = [...new Set(path.map(({ to }) => to))];
     vote.description = path
@@ -374,7 +374,7 @@ async function loadBlockTimestamp(blockNumber) {
 
 // Apply transformations to a vote received from web3
 // Note: ignores the 'open' field as we calculate that locally
-async function marshallVote({
+function marshallVote({
   executed,
   minAcceptQuorum,
   nay,

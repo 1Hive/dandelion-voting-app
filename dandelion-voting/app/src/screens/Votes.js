@@ -91,6 +91,7 @@ const Votes = React.memo(function Votes({
                   </span>
                 </div>,
                 "Open",
+                "Upcoming",
                 "Closed"
               ]}
               width="128px"

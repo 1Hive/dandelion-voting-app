@@ -13,7 +13,7 @@ const VoteCardGroup = ({ title, count, children }) => {
   const theme = useTheme();
   const { layoutName } = useLayout();
   const compactMode = layoutName === "small";
-  const rowHeight = compactMode ? null : 330;
+  const rowHeight = compactMode ? null : 293;
 
   return (
     <section>

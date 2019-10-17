@@ -1,7 +1,7 @@
-const ETH_ADDRESS_SPLIT_REGEX = /(0x[a-fA-F0-9]{40}(?:\b|\.|,|\?|!|;))/g
-const ETH_ADDRESS_TEST_REGEX = /(0x[a-fA-F0-9]{40}(?:\b|\.|,|\?|!|;))/g
+const ETH_ADDRESS_SPLIT_REGEX = /(0x[a-fA-F0-9]{40}(?:\b|\.|,|\?|!|;))/g;
+const ETH_ADDRESS_TEST_REGEX = /(0x[a-fA-F0-9]{40}(?:\b|\.|,|\?|!|;))/g;
 
-export const EMPTY_ADDRESS = '0x0000000000000000000000000000000000000000'
+export const EMPTY_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 // Detect Ethereum addresses in a string and transform each part.
 //
@@ -14,7 +14,7 @@ export function transformAddresses(str, callback) {
     .split(ETH_ADDRESS_SPLIT_REGEX)
     .map((part, index) =>
       callback(part, ETH_ADDRESS_TEST_REGEX.test(part), index)
-    )
+    );
 }
 
 /**
@@ -24,7 +24,13 @@ export function transformAddresses(str, callback) {
  * @returns {boolean} Address equality
  */
 export function addressesEqual(first, second) {
-  first = first && first.toLowerCase()
-  second = second && second.toLowerCase()
-  return first === second
+  first = first && first.toLowerCase();
+  second = second && second.toLowerCase();
+  return first === second;
 }
+
+export const loadBlockTimestamp = async (blockNumber, api) => {
+  const { timestamp } = await api.web3Eth("getBlock", blockNumber).toPromise();
+  // Adjust for solidity time (s => ms)
+  return timestamp * 1000;
+};

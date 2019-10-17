@@ -81,8 +81,6 @@ export function useAppLogic() {
   console.log("APPLOGIC ", votes);
   const [selectedVote, selectVote] = useSelectedVote(votes);
   const newVotePanel = usePanelState();
-  const blockTime = useBlockTime();
-  console.log("useBlockTime ", blockTime);
 
   const actions = {
     createVote: useCreateVoteAction(newVotePanel.requestClose),
