@@ -4,6 +4,7 @@ import { useCurrentApp } from "@aragon/api-react";
 import { useSettings } from "../vote-settings-manager";
 import {
   VOTE_STATUS_ONGOING,
+  VOTE_STATUS_UPCOMING,
   VOTE_STATUS_REJECTED,
   VOTE_STATUS_ACCEPTED,
   VOTE_STATUS_PENDING_ENACTMENT,
@@ -14,6 +15,7 @@ import { getVoteStatus } from "../vote-utils";
 const NULL_FILTER_STATE = -1;
 const STATUS_FILTER_OPEN = 1;
 const STATUS_FILTER_CLOSED = 2;
+const STATUS_FILTER_UPCOMING = 3;
 const TREND_FILTER_WILL_PASS = 1;
 const TREND_FILTER_WILL_NOT_PASS = 2;
 const OUTCOME_FILTER_PASSED = 1;
@@ -26,6 +28,8 @@ function testStatusFilter(filter, voteStatus) {
   return (
     filter === NULL_FILTER_STATE ||
     (filter === STATUS_FILTER_OPEN && voteStatus === VOTE_STATUS_ONGOING) ||
+    (filter === STATUS_FILTER_UPCOMING &&
+      voteStatus === VOTE_STATUS_UPCOMING) ||
     (filter === STATUS_FILTER_CLOSED && voteStatus !== VOTE_STATUS_ONGOING)
   );
 }

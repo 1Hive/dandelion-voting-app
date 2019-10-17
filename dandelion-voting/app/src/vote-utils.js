@@ -4,6 +4,7 @@ import {
   VOTE_YEA,
   VOTE_NAY,
   VOTE_STATUS_ONGOING,
+  VOTE_STATUS_UPCOMING,
   VOTE_STATUS_REJECTED,
   VOTE_STATUS_ACCEPTED,
   VOTE_STATUS_PENDING_ENACTMENT,
@@ -36,6 +37,9 @@ export const getQuorumProgress = ({ numData: { yea, votingPower } }) =>
 export function getVoteStatus(vote, pctBase) {
   if (vote.data.open) {
     return VOTE_STATUS_ONGOING;
+  }
+  if (vote.data.pending) {
+    return VOTE_STATUS_UPCOMING;
   }
   if (!getVoteSuccess(vote, pctBase)) {
     return VOTE_STATUS_REJECTED;

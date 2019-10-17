@@ -33,8 +33,18 @@ const VoteCard = ({ vote, onOpen }) => {
     voteId
   } = vote;
   const { votingPower, yea, nay } = numData;
-  const { open, metadata, description, startDate, pending } = data;
-  const endDate = new Date(startDate + voteDurationBlocks * blockTime * 1000);
+  const {
+    open,
+    metadata,
+    description,
+    startDate,
+    pending,
+    pendingStartDate
+  } = data;
+
+  const endDate = pending
+    ? pendingStartDate
+    : new Date(startDate + voteDurationBlocks * blockTime * 1000);
 
   const options = useMemo(
     () => [

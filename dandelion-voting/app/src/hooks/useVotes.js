@@ -9,6 +9,7 @@ import { isVoteOpen, isVotePending } from "../vote-utils";
 import { VOTE_ABSENT } from "../vote-types";
 import { EMPTY_ADDRESS, loadBlockTimestamp } from "../web3-utils";
 import useBlockNumber from "./useBlockNumber";
+import useBlockTime from "./useBlockTime";
 
 // Temporary fix to make sure executionTargets always returns an array, until
 // we find out the reason why it can sometimes be missing in the cached data.
@@ -97,8 +98,10 @@ function useDecoratedVotes() {
 // Get the votes array ready to be used in the app.
 export default function useVotes() {
   const [votes, executionTargets] = useDecoratedVotes();
+  const blockTime = useBlockTime();
   const [votesStartTimestamps, setVotesStartTimestamps] = useState(new Map());
   const [votesEndTimestamps, setVotesEndTimestamps] = useState(new Map());
+  const nowDate = Date.now();
   const blockNumber = useBlockNumber();
   const api = useApi();
 
@@ -142,7 +145,11 @@ export default function useVotes() {
           open: openedStates[i],
           pending: pendingToStartStates[i],
           startDate: votesStartTimestamps.get(vote.voteId) || null,
-          endDate: votesEndTimestamps.get(vote.voteId) || null
+          endDate: votesEndTimestamps.get(vote.voteId) || null,
+          pendingStartDate:
+            new Date(
+              nowDate + (vote.data.startBlock - blockNumber) * blockTime * 1000
+            ) || null
         }
       }));
     }, [

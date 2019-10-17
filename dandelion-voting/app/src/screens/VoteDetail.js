@@ -271,14 +271,16 @@ function Status({ vote, voteDurationBlocks }) {
     endDate,
     executionDate,
     executionTransaction,
-    open
+    open,
+    pending,
+    pendingStartDate
   } = vote.data;
 
-  if (open) {
+  if (open || pending) {
     const blockTime = useBlockTime();
-    const estimatedEndDate = new Date(
-      startDate + voteDurationBlocks * blockTime * 1000
-    );
+    const estimatedDate = pending
+      ? pendingStartDate
+      : new Date(startDate + voteDurationBlocks * blockTime * 1000);
     return (
       <React.Fragment>
         <div
@@ -288,9 +290,9 @@ function Status({ vote, voteDurationBlocks }) {
             margin-bottom: ${1 * GU}px;
           `}
         >
-          Time remaining
+          {pending ? `Time to start ` : ` Time remaining`}
         </div>
-        {estimatedEndDate && <Timer end={estimatedEndDate} maxUnits={4} />}
+        {estimatedDate && <Timer end={estimatedDate} maxUnits={4} />}
       </React.Fragment>
     );
   }
