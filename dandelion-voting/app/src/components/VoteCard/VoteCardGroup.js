@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react'
 import {
   CardLayout,
   Tag,
@@ -7,13 +7,13 @@ import {
   unselectable,
   useLayout,
   useTheme
-} from "@aragon/ui";
+} from '@aragon/ui'
 
 const VoteCardGroup = ({ title, count, children }) => {
-  const theme = useTheme();
-  const { layoutName } = useLayout();
-  const compactMode = layoutName === "small";
-  const rowHeight = compactMode ? null : 293;
+  const theme = useTheme()
+  const { layoutName } = useLayout()
+  const compactMode = layoutName === 'small'
+  const rowHeight = compactMode ? null : 293
 
   return (
     <section>
@@ -22,13 +22,13 @@ const VoteCardGroup = ({ title, count, children }) => {
           display: flex;
           align-items: center;
           margin-bottom: ${3 * GU}px;
-          ${compactMode ? `padding: 0 ${2 * GU}px;` : ""}
+          ${compactMode ? `padding: 0 ${2 * GU}px;` : ''}
           ${unselectable};
         `}
       >
         <div
           css={`
-            ${textStyle("body2")};
+            ${textStyle('body2')};
             color: ${theme.content};
           `}
         >
@@ -42,14 +42,14 @@ const VoteCardGroup = ({ title, count, children }) => {
             justify-content: center;
           `}
         >
-          <Tag limitDigits={4} label={count} size="small" />
+          <Tag limitDigits={4} label={count} size='small' />
         </span>
       </h2>
       <CardLayout columnWidthMin={30 * GU} rowHeight={rowHeight}>
         {children}
       </CardLayout>
     </section>
-  );
-};
+  )
+}
 
-export default VoteCardGroup;
+export default VoteCardGroup

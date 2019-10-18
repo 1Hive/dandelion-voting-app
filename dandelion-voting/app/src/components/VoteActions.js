@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from "react";
-import styled from "styled-components";
+import React, { useEffect, useState } from 'react'
+import styled from 'styled-components'
 import {
   Button,
   GU,
@@ -10,21 +10,21 @@ import {
   RADIUS,
   textStyle,
   useTheme
-} from "@aragon/ui";
-import { useAppState, useConnectedAccount } from "@aragon/api-react";
-import useExtendedVoteData from "../hooks/useExtendedVoteData";
-import { noop, formatDate } from "../utils";
-import { VOTE_NAY, VOTE_YEA } from "../vote-types";
-import { isVoteAction } from "../vote-utils";
+} from '@aragon/ui'
+import { useAppState, useConnectedAccount } from '@aragon/api-react'
+import useExtendedVoteData from '../hooks/useExtendedVoteData'
+import { noop, formatDate } from '../utils'
+import { VOTE_NAY, VOTE_YEA } from '../vote-types'
+import { isVoteAction } from '../vote-utils'
 
 const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
-  const [ready, setReady] = useState(false);
-  const theme = useTheme();
-  const connectedAccount = useConnectedAccount();
-  const { tokenSymbol } = useAppState();
+  const [ready, setReady] = useState(false)
+  const theme = useTheme()
+  const connectedAccount = useConnectedAccount()
+  const { tokenSymbol } = useAppState()
 
-  const { connectedAccountVote, data } = vote;
-  const { snapshotBlock, startDate, open } = data;
+  const { connectedAccountVote, data } = vote
+  const { snapshotBlock, startDate, open } = data
   const {
     canUserVote,
     canExecute,
@@ -34,12 +34,12 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
     userBalancePromise,
     userBalanceNowPromise,
     canExecutePromise
-  } = useExtendedVoteData(vote);
+  } = useExtendedVoteData(vote)
 
-  const hasVoted = [VOTE_YEA, VOTE_NAY].includes(connectedAccountVote);
+  const hasVoted = [VOTE_YEA, VOTE_NAY].includes(connectedAccountVote)
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
     const whenReady = async () => {
       await Promise.all([
@@ -47,26 +47,26 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
         canExecutePromise,
         userBalancePromise,
         userBalanceNowPromise
-      ]);
+      ])
       if (!cancelled) {
-        setReady(true);
+        setReady(true)
       }
-    };
-    setReady(false);
-    whenReady();
+    }
+    setReady(false)
+    whenReady()
 
     return () => {
-      cancelled = true;
-    };
+      cancelled = true
+    }
   }, [
     userBalancePromise,
     canUserVotePromise,
     canExecutePromise,
     userBalanceNowPromise
-  ]);
+  ])
 
   if (!ready) {
-    return null;
+    return null
   }
 
   if (!open) {
@@ -74,18 +74,18 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
       <React.Fragment>
         {canExecute && isVoteAction(vote) && (
           <React.Fragment>
-            <Button mode="strong" onClick={onExecute} wide>
+            <Button mode='strong' onClick={onExecute} wide>
               Enact this vote
             </Button>
             <Info>
-              The voting period is closed and the vote has passed.{" "}
+              The voting period is closed and the vote has passed.{' '}
               <strong>Anyone</strong> can now enact this vote to execute its
               action.
             </Info>
           </React.Fragment>
         )}
       </React.Fragment>
-    );
+    )
   }
 
   if (canUserVote) {
@@ -113,19 +113,19 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
           >
             <div
               css={`
-                ${textStyle("body1")};
+                ${textStyle('body1')};
               `}
             >
               You must enable your account to vote on this proposal
             </div>
             <div
               css={`
-                ${textStyle("body2")};
+                ${textStyle('body2')};
                 color: ${theme.surfaceContentSecondary};
                 margin-top: ${2 * GU}px;
               `}
             >
-              Connect to your Ethereum provider by clicking on the{" "}
+              Connect to your Ethereum provider by clicking on the{' '}
               <strong
                 css={`
                   display: inline-flex;
@@ -135,57 +135,57 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
                 `}
               >
                 <IconConnect /> Enable account
-              </strong>{" "}
+              </strong>{' '}
               button on the header. You may be temporarily redirected to a new
               screen.
             </div>
           </div>
         )}
       </div>
-    );
+    )
   }
 
   if (hasVoted) {
     return (
       <div>
         <Buttons disabled />
-        <Info mode="warning">
+        <Info mode='warning'>
           You have already voted and changing vote is not allowed.
         </Info>
       </div>
-    );
+    )
   }
 
   return (
     <div>
       <Buttons disabled />
-      <Info mode="warning">
+      <Info mode='warning'>
         {userBalanceNow > 0
-          ? "Although the currently connected account holds tokens, it"
-          : "The currently connected account"}{" "}
+          ? 'Although the currently connected account holds tokens, it'
+          : 'The currently connected account'}{' '}
         did not hold any <strong>{tokenSymbol}</strong> tokens when this vote
         began ({formatDate(startDate)}) and therefore cannot participate in this
-        vote. Make sure your accounts are holding <strong>{tokenSymbol}</strong>{" "}
+        vote. Make sure your accounts are holding <strong>{tokenSymbol}</strong>{' '}
         at the time a vote begins if you'd like to vote using this Voting app.
       </Info>
     </div>
-  );
-});
+  )
+})
 
 const Buttons = ({ onClickYes = noop, onClickNo = noop, disabled = false }) => (
   <ButtonsContainer>
-    <VotingButton mode="positive" wide disabled={disabled} onClick={onClickYes}>
+    <VotingButton mode='positive' wide disabled={disabled} onClick={onClickYes}>
       <IconCheck
-        size="small"
+        size='small'
         css={`
           margin-right: ${1 * GU}px;
         `}
       />
       Yes
     </VotingButton>
-    <VotingButton mode="negative" wide disabled={disabled} onClick={onClickNo}>
+    <VotingButton mode='negative' wide disabled={disabled} onClick={onClickNo}>
       <IconCross
-        size="small"
+        size='small'
         css={`
           margin-right: ${1 * GU}px;
         `}
@@ -193,12 +193,12 @@ const Buttons = ({ onClickYes = noop, onClickNo = noop, disabled = false }) => (
       No
     </VotingButton>
   </ButtonsContainer>
-);
+)
 
 const ButtonsContainer = styled.div`
   display: flex;
   margin-bottom: ${2 * GU}px;
-`;
+`
 
 const TokenReference = ({
   snapshotBlock,
@@ -208,32 +208,32 @@ const TokenReference = ({
   userBalanceNow
 }) => (
   <Info>
-    Voting with{" "}
+    Voting with{' '}
     <strong>
       {userBalance} {tokenSymbol}
-    </strong>{" "}
-    due to the snapshot taken at block <strong>{snapshotBlock}</strong> at{" "}
-    <strong>{formatDate(startDate)}</strong>.{" "}
+    </strong>{' '}
+    due to the snapshot taken at block <strong>{snapshotBlock}</strong> at{' '}
+    <strong>{formatDate(startDate)}</strong>.{' '}
     {userBalance !== userBalanceNow ? (
       <span>
-        Your current balance is{" "}
+        Your current balance is{' '}
         <strong>
           {userBalanceNow} {tokenSymbol}
         </strong>
         )
       </span>
     ) : (
-      ""
+      ''
     )}
   </Info>
-);
+)
 
 const VotingButton = styled(Button)`
-  ${textStyle("body2")};
+  ${textStyle('body2')};
   width: 50%;
   &:first-child {
     margin-right: ${1 * GU}px;
   }
-`;
+`
 
-export default VoteActions;
+export default VoteActions

@@ -1,18 +1,18 @@
-import Aragon, { events } from "@aragon/api";
-import { addressesEqual } from "./web3-utils";
-import voteSettings from "./vote-settings";
-import { VOTE_ABSENT } from "./vote-types";
-import { voteTypeFromContractEnum } from "./vote-utils";
-import { EMPTY_CALLSCRIPT } from "./evmscript-utils";
-import tokenDecimalsAbi from "./abi/token-decimals.json";
-import tokenSymbolAbi from "./abi/token-symbol.json";
-import { toUnicode } from "punycode";
+import Aragon, { events } from '@aragon/api'
+import { addressesEqual } from './web3-utils'
+import voteSettings from './vote-settings'
+import { VOTE_ABSENT } from './vote-types'
+import { voteTypeFromContractEnum } from './vote-utils'
+import { EMPTY_CALLSCRIPT } from './evmscript-utils'
+import tokenDecimalsAbi from './abi/token-decimals.json'
+import tokenSymbolAbi from './abi/token-symbol.json'
+import { toUnicode } from 'punycode'
 
-const tokenAbi = [].concat(tokenDecimalsAbi, tokenSymbolAbi);
+const tokenAbi = [].concat(tokenDecimalsAbi, tokenSymbolAbi)
 
-const app = new Aragon();
+const app = new Aragon()
 
-let connectedAccount;
+let connectedAccount
 
 /*
  * Calls `callback` exponentially, everytime `retry()` is called.
@@ -34,110 +34,110 @@ const retryEvery = async (
   callback,
   { initialRetryTimer = 1000, increaseFactor = 3, maxRetries = 3 } = {}
 ) => {
-  const sleep = time => new Promise(resolve => setTimeout(resolve, time));
+  const sleep = time => new Promise(resolve => setTimeout(resolve, time))
 
-  let retryNum = 0;
+  let retryNum = 0
   const attempt = async (retryTimer = initialRetryTimer) => {
     try {
-      return await callback();
+      return await callback()
     } catch (err) {
       if (retryNum === maxRetries) {
-        throw err;
+        throw err
       }
-      ++retryNum;
+      ++retryNum
 
       // Exponentially backoff attempts
-      const nextRetryTime = retryTimer * increaseFactor;
+      const nextRetryTime = retryTimer * increaseFactor
       console.log(
         `Retrying in ${nextRetryTime}s... (attempt ${retryNum} of ${maxRetries})`
-      );
-      await sleep(nextRetryTime);
-      return attempt(nextRetryTime);
+      )
+      await sleep(nextRetryTime)
+      return attempt(nextRetryTime)
     }
-  };
+  }
 
-  return attempt();
-};
+  return attempt()
+}
 
 // Get the token address to initialize ourselves
 retryEvery(() =>
   app
-    .call("token")
+    .call('token')
     .toPromise()
     .then(initialize)
     .catch(err => {
       console.error(
-        "Could not start background script execution due to the contract not loading the token:",
+        'Could not start background script execution due to the contract not loading the token:',
         err
-      );
-      throw err;
+      )
+      throw err
     })
-);
+)
 
 async function initialize(tokenAddr) {
   return app.store(
     (state, { blockNumber, event, returnValues, transactionHash }) => {
       const nextState = {
         ...state
-      };
+      }
 
       switch (event) {
         case events.ACCOUNTS_TRIGGER:
-          return updateConnectedAccount(nextState, returnValues);
+          return updateConnectedAccount(nextState, returnValues)
         case events.SYNC_STATUS_SYNCING:
-          return { ...nextState, isSyncing: true };
+          return { ...nextState, isSyncing: true }
         case events.SYNC_STATUS_SYNCED:
-          return { ...nextState, isSyncing: false };
-        case "CastVote":
-          return castVote(nextState, returnValues);
-        case "ExecuteVote":
+          return { ...nextState, isSyncing: false }
+        case 'CastVote':
+          return castVote(nextState, returnValues)
+        case 'ExecuteVote':
           return executeVote(nextState, returnValues, {
             blockNumber,
             transactionHash
-          });
-        case "StartVote":
-          return startVote(nextState, returnValues);
+          })
+        case 'StartVote':
+          return startVote(nextState, returnValues)
         default:
-          return nextState;
+          return nextState
       }
     },
     { init: initState(tokenAddr) }
-  );
+  )
 }
 
 const initState = tokenAddr => async cachedState => {
-  const token = app.external(tokenAddr, tokenAbi);
+  const token = app.external(tokenAddr, tokenAbi)
 
-  let tokenSymbol;
+  let tokenSymbol
   try {
-    tokenSymbol = await token.symbol().toPromise();
-    const pctBase = parseInt(await app.call("PCT_BASE").toPromise(), 10);
+    tokenSymbol = await token.symbol().toPromise()
+    const pctBase = parseInt(await app.call('PCT_BASE').toPromise(), 10)
     const supportRequiredPct = parseInt(
-      await app.call("supportRequiredPct").toPromise(),
+      await app.call('supportRequiredPct').toPromise(),
       10
-    );
-    const supportRequired = Math.round((supportRequiredPct / pctBase) * 100);
-    app.identify(`${tokenSymbol} (${supportRequired}%)`);
+    )
+    const supportRequired = Math.round((supportRequiredPct / pctBase) * 100)
+    app.identify(`${tokenSymbol} (${supportRequired}%)`)
   } catch (err) {
     console.error(
       `Failed to load information to identify voting app due to:`,
       err
-    );
+    )
   }
 
-  let tokenDecimals;
+  let tokenDecimals
   try {
-    tokenDecimals = (await token.decimals().toPromise()) || "0";
+    tokenDecimals = (await token.decimals().toPromise()) || '0'
   } catch (err) {
     console.error(
       `Failed to load token decimals for token at ${tokenAddr} due to:`,
       err
-    );
-    console.error("Defaulting to 0...");
-    tokenDecimals = "0";
+    )
+    console.error('Defaulting to 0...')
+    tokenDecimals = '0'
   }
 
-  const voteSettings = await loadVoteSettings();
+  const voteSettings = await loadVoteSettings()
 
   return {
     ...cachedState,
@@ -145,8 +145,8 @@ const initState = tokenAddr => async cachedState => {
     tokenDecimals,
     tokenSymbol,
     ...voteSettings
-  };
-};
+  }
+}
 
 /***********************
  *                     *
@@ -155,10 +155,8 @@ const initState = tokenAddr => async cachedState => {
  ***********************/
 
 async function updateConnectedAccount(state, { account }) {
-  connectedAccount = account;
-  const lastTimeVotedY = await app
-    .call("lastYeaVoteBlock", account)
-    .toPromise();
+  connectedAccount = account
+  const lastTimeVotedY = await app.call('lastYeaVoteBlock', account).toPromise()
   return {
     ...state,
     lastTimeVotedYes:
@@ -170,21 +168,21 @@ async function updateConnectedAccount(state, { account }) {
           votes: state.votes
         })
       : {}
-  };
+  }
 }
 
 async function castVote(state, { voteId, voter }) {
-  const { connectedAccountVotes } = state;
-  let lastTimeVotedY;
+  const { connectedAccountVotes } = state
+  let lastTimeVotedY
   // If the connected account was the one who made the vote, update their voter status
   if (addressesEqual(connectedAccount, voter)) {
-    lastTimeVotedY = await app.call("lastYeaVoteBlock", voter).toPromise();
+    lastTimeVotedY = await app.call('lastYeaVoteBlock', voter).toPromise()
     // fetch vote state for the connected account for this voteId
     const { voteType } = await loadVoterState({
       connectedAccount,
       voteId
-    });
-    connectedAccountVotes[voteId] = voteType;
+    })
+    connectedAccountVotes[voteId] = voteType
   }
 
   const transform = async vote => ({
@@ -194,7 +192,7 @@ async function castVote(state, { voteId, voter }) {
       ...vote.data,
       ...(await loadVoteData(voteId))
     }
-  });
+  })
 
   return updateState(
     {
@@ -205,7 +203,7 @@ async function castVote(state, { voteId, voter }) {
     },
     voteId,
     transform
-  );
+  )
 }
 
 async function executeVote(
@@ -221,11 +219,11 @@ async function executeVote(
       executionDate: await loadBlockTimestamp(blockNumber),
       executionTransaction: transactionHash
     }
-  });
-  return updateState(state, voteId, transform);
+  })
+  return updateState(state, voteId, transform)
 }
 
-async function startVote(state, { creator, metadata = "", voteId }) {
+async function startVote(state, { creator, metadata = '', voteId }) {
   return updateState(state, voteId, vote => ({
     ...vote,
     data: {
@@ -233,7 +231,7 @@ async function startVote(state, { creator, metadata = "", voteId }) {
       creator,
       metadata
     }
-  }));
+  }))
 }
 
 /***********************
@@ -243,16 +241,16 @@ async function startVote(state, { creator, metadata = "", voteId }) {
  ***********************/
 
 async function updateState(state, voteId, transform) {
-  const { votes = [] } = state;
+  const { votes = [] } = state
 
   return {
     ...state,
     votes: await updateVotes(votes, voteId, transform)
-  };
+  }
 }
 
 async function updateVotes(votes, voteId, transform) {
-  const voteIndex = votes.findIndex(vote => vote.voteId === voteId);
+  const voteIndex = votes.findIndex(vote => vote.voteId === voteId)
 
   if (voteIndex === -1) {
     // If we can't find it, load its data, perform the transformation, and concat
@@ -261,12 +259,12 @@ async function updateVotes(votes, voteId, transform) {
         voteId,
         data: await loadVoteData(voteId)
       })
-    );
-    return ret;
+    )
+    return ret
   } else {
-    const nextVotes = Array.from(votes);
-    nextVotes[voteIndex] = await transform(nextVotes[voteIndex]);
-    return nextVotes;
+    const nextVotes = Array.from(votes)
+    nextVotes[voteIndex] = await transform(nextVotes[voteIndex])
+    return nextVotes
   }
 }
 
@@ -277,13 +275,13 @@ async function getAccountVotes({ connectedAccount, votes = [] }) {
   )
     .then(voteStates =>
       voteStates.reduce((states, { voteId, voteType }) => {
-        states[voteId] = voteType;
-        return states;
+        states[voteId] = voteType
+        return states
       }, {})
     )
-    .catch(console.error);
+    .catch(console.error)
 
-  return connectedAccountVotes;
+  return connectedAccountVotes
 }
 
 async function loadVoterState({ connectedAccount, voteId }) {
@@ -291,12 +289,12 @@ async function loadVoterState({ connectedAccount, voteId }) {
     return {
       voteId,
       voteType: VOTE_ABSENT
-    };
+    }
   }
   // Wrap with retry in case the vote is somehow not present
   return retryEvery(() =>
     app
-      .call("getVoterState", voteId, connectedAccount)
+      .call('getVoterState', voteId, connectedAccount)
       .toPromise()
       .then(voteTypeFromContractEnum)
       .then(voteType => ({ voteId, voteType }))
@@ -304,62 +302,62 @@ async function loadVoterState({ connectedAccount, voteId }) {
         console.error(
           `Error fetching voter state (${connectedAccount}, ${voteId})`,
           err
-        );
-        throw err;
+        )
+        throw err
       })
-  );
+  )
 }
 
 async function loadVoteDescription(vote) {
-  vote.description = "";
-  vote.executionTargets = [];
+  vote.description = ''
+  vote.executionTargets = []
   if (!vote.script || vote.script === EMPTY_CALLSCRIPT) {
-    return vote;
+    return vote
   }
 
   try {
-    const path = await app.describeScript(vote.script).toPromise();
+    const path = await app.describeScript(vote.script).toPromise()
     // Get unique list of targets
-    vote.executionTargets = [...new Set(path.map(({ to }) => to))];
+    vote.executionTargets = [...new Set(path.map(({ to }) => to))]
     vote.description = path
       ? path
           .map(step => {
-            const identifier = step.identifier ? ` (${step.identifier})` : "";
-            const app = step.name ? `${step.name}${identifier}` : `${step.to}`;
+            const identifier = step.identifier ? ` (${step.identifier})` : ''
+            const app = step.name ? `${step.name}${identifier}` : `${step.to}`
 
-            return `${app}: ${step.description || "No description"}`;
+            return `${app}: ${step.description || 'No description'}`
           })
-          .join("\n")
-      : "";
+          .join('\n')
+      : ''
   } catch (error) {
-    console.error("Error describing vote script", error);
-    vote.description = "Invalid script. The result cannot be executed.";
+    console.error('Error describing vote script', error)
+    vote.description = 'Invalid script. The result cannot be executed.'
   }
 
-  return vote;
+  return vote
 }
 
 function loadVoteData(voteId) {
   // Wrap with retry in case the vote is somehow not present
   return retryEvery(() =>
     app
-      .call("getVote", voteId)
+      .call('getVote', voteId)
       .toPromise()
       .then(vote => loadVoteDescription(marshallVote(vote)))
       .catch(err => {
-        console.error(`Error fetching vote (${voteId})`, err);
-        throw err;
+        console.error(`Error fetching vote (${voteId})`, err)
+        throw err
       })
-  );
+  )
 }
 
 function loadVoteSettings() {
   return Promise.all(
-    voteSettings.map(([name, key, type = "string"]) =>
+    voteSettings.map(([name, key, type = 'string']) =>
       app
         .call(name)
         .toPromise()
-        .then(val => (type === "time" ? marshallDate(val) : val))
+        .then(val => (type === 'time' ? marshallDate(val) : val))
         .then(value => ({ [key]: value }))
     )
   )
@@ -367,16 +365,16 @@ function loadVoteSettings() {
       settings.reduce((acc, setting) => ({ ...acc, ...setting }), {})
     )
     .catch(err => {
-      console.error("Failed to load Vote settings", err);
+      console.error('Failed to load Vote settings', err)
       // Return an empty object to try again later
-      return {};
-    });
+      return {}
+    })
 }
 
 async function loadBlockTimestamp(blockNumber) {
-  const { timestamp } = await app.web3Eth("getBlock", blockNumber).toPromise();
+  const { timestamp } = await app.web3Eth('getBlock', blockNumber).toPromise()
   // Adjust for solidity time (s => ms)
-  return timestamp * 1000;
+  return timestamp * 1000
 }
 
 // Apply transformations to a vote received from web3
@@ -403,11 +401,11 @@ function marshallVote({
     // Like times, blocks should be safe to represent as real numbers
     snapshotBlock: parseInt(snapshotBlock, 10),
     startBlock: parseInt(startBlock, 10)
-  };
+  }
 }
 
 function marshallDate(date) {
   // Represent dates as real numbers, as it's very unlikely they'll hit the limit...
   // Adjust for js time (in ms vs s)
-  return parseInt(date, 10) * 1000;
+  return parseInt(date, 10) * 1000
 }
