@@ -24,9 +24,9 @@
     "build:app": "parcel build app/index.html -d dist/ --public-url \".\" --no-cache",
     "build:script": "parcel build app/script.js -d dist/ --no-cache",
     "build": "npm run build:app && npm run build:script",
-    "publish:patch": "aragon apm publish patch",
-    "publish:minor": "aragon apm publish minor",
-    "publish:major": "aragon apm publish major",
+    "publish:patch": "aragon apm publish patch --files dist",
+    "publish:minor": "aragon apm publish minor --files dist",
+    "publish:major": "aragon apm publish major --files dist",
     "versions": "aragon apm versions",
     "ganache-cli:test": "sh ./node_modules/@aragon/test-helpers/ganache-cli.sh"
   },
