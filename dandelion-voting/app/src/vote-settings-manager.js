@@ -13,7 +13,6 @@ export const useSettings = () => useContext(SettingsContext);
 
 export function SettingsProvider({ children }) {
   const { pctBase, voteDurationBlocks } = useAppState();
-  console.log("voteDurationBlocks ", voteDurationBlocks);
   return (
     <SettingsContext.Provider value={{ pctBase, voteDurationBlocks }}>
       {children}

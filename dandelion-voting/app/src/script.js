@@ -89,16 +89,13 @@ async function initialize(tokenAddr) {
         case events.SYNC_STATUS_SYNCED:
           return { ...nextState, isSyncing: false };
         case "CastVote":
-          console.log("CAST VOTEEEEE");
           return castVote(nextState, returnValues);
         case "ExecuteVote":
-          console.log("EXECUTE VOTE");
           return executeVote(nextState, returnValues, {
             blockNumber,
             transactionHash
           });
         case "StartVote":
-          console.log("START VOTEEEEE");
           return startVote(nextState, returnValues);
         default:
           return nextState;
@@ -159,8 +156,13 @@ const initState = tokenAddr => async cachedState => {
 
 async function updateConnectedAccount(state, { account }) {
   connectedAccount = account;
+  const lastTimeVotedY = await app
+    .call("lastYeaVoteBlock", account)
+    .toPromise();
   return {
     ...state,
+    lastTimeVotedYes:
+      lastTimeVotedY != 0 ? await loadBlockTimestamp(lastTimeVotedY) : null,
     // fetch all the votes casted by the connected account
     connectedAccountVotes: state.votes
       ? await getAccountVotes({
@@ -172,10 +174,11 @@ async function updateConnectedAccount(state, { account }) {
 }
 
 async function castVote(state, { voteId, voter }) {
-  console.log("*** CastVote ", voter);
   const { connectedAccountVotes } = state;
+  let lastTimeVotedY;
   // If the connected account was the one who made the vote, update their voter status
   if (addressesEqual(connectedAccount, voter)) {
+    lastTimeVotedY = await app.call("lastYeaVoteBlock", voter).toPromise();
     // fetch vote state for the connected account for this voteId
     const { voteType } = await loadVoterState({
       connectedAccount,
@@ -185,6 +188,7 @@ async function castVote(state, { voteId, voter }) {
   }
 
   const transform = async vote => ({
+    ...state,
     ...vote,
     data: {
       ...vote.data,
@@ -192,7 +196,16 @@ async function castVote(state, { voteId, voter }) {
     }
   });
 
-  return updateState({ ...state, connectedAccountVotes }, voteId, transform);
+  return updateState(
+    {
+      ...state,
+      connectedAccountVotes,
+      lastTimeVotedYes:
+        lastTimeVotedY != 0 ? await loadBlockTimestamp(lastTimeVotedY) : null
+    },
+    voteId,
+    transform
+  );
 }
 
 async function executeVote(
@@ -239,10 +252,7 @@ async function updateState(state, voteId, transform) {
 }
 
 async function updateVotes(votes, voteId, transform) {
-  console.log("*** UpdateVotes votes ", votes);
-  console.log("*** UpdateVotes voteId ", voteId);
   const voteIndex = votes.findIndex(vote => vote.voteId === voteId);
-  console.log("*** UpdateVotes index ", voteIndex);
 
   if (voteIndex === -1) {
     // If we can't find it, load its data, perform the transformation, and concat
@@ -252,7 +262,6 @@ async function updateVotes(votes, voteId, transform) {
         data: await loadVoteData(voteId)
       })
     );
-    console.log("*** UpdateVotes votes transformed ", ret);
     return ret;
   } else {
     const nextVotes = Array.from(votes);
@@ -304,14 +313,12 @@ async function loadVoterState({ connectedAccount, voteId }) {
 async function loadVoteDescription(vote) {
   vote.description = "";
   vote.executionTargets = [];
-  console.log("loadVoteDescription vote ", vote);
   if (!vote.script || vote.script === EMPTY_CALLSCRIPT) {
     return vote;
   }
 
   try {
     const path = await app.describeScript(vote.script).toPromise();
-    console.log("loadVoteDescription path ", path);
     // Get unique list of targets
     vote.executionTargets = [...new Set(path.map(({ to }) => to))];
     vote.description = path
@@ -385,10 +392,6 @@ function marshallVote({
   yea,
   script
 }) {
-  //console.log("Marshal vote **** start block  ", startBlock);
-  //const startDate = await loadBlockTimestamp(startBlock);
-  //console.log("Marsahl vote **** startDate ", startDate);
-
   return {
     executed,
     minAcceptQuorum,

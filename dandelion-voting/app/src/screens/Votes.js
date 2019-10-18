@@ -7,8 +7,12 @@ import {
   textStyle,
   useLayout,
   useTheme,
+  Split,
+  Box,
+  IconTime,
   _DateRange as DateRange
 } from "@aragon/ui";
+import { format } from "date-fns";
 import EmptyFilteredVotes from "../components/EmptyFilteredVotes";
 import VoteCard from "../components/VoteCard/VoteCard";
 import VoteCardGroup from "../components/VoteCard/VoteCardGroup";
@@ -44,11 +48,13 @@ const Votes = React.memo(function Votes({
   handleVoteAppFilterChange,
   voteDateRangeFilter,
   handleVoteDateRangeFilterChange,
-  handleClearFilters
+  handleClearFilters,
+  lastTimeVotedYes
 }) {
   const theme = useTheme();
   const { layoutName } = useLayout();
   const { openVotes, pendingVotes, closedVotes } = useVotes(filteredVotes);
+  const formatDate = date => `${format(date, "do MMM yy, HH:mm")} UTC`;
 
   const multipleOfTarget = executionTargets.reduce((map, { name }) => {
     map.set(name, map.has(name));
@@ -144,16 +150,51 @@ const Votes = React.memo(function Votes({
           </div>
         </Bar>
       )}
-      {!filteredVotes.length ? (
-        <EmptyFilteredVotes onClear={handleClearFilters} />
-      ) : (
-        <VoteGroups
-          openVotes={openVotes}
-          pendingVotes={pendingVotes}
-          closedVotes={closedVotes}
-          onSelectVote={selectVote}
-        />
-      )}
+      <Split
+        primary={
+          <React.Fragment>
+            {!filteredVotes.length ? (
+              <EmptyFilteredVotes onClear={handleClearFilters} />
+            ) : (
+              <VoteGroups
+                openVotes={openVotes}
+                pendingVotes={pendingVotes}
+                closedVotes={closedVotes}
+                onSelectVote={selectVote}
+              />
+            )}
+          </React.Fragment>
+        }
+        secondary={
+          <React.Fragment>
+            <Box
+              css={`
+                margin-top: ${6 * GU}px;
+              `}
+              heading="Last time Yes"
+            >
+              <React.Fragment>
+                <div
+                  css={`
+                    margin-top: ${1 * GU}px;
+                    display: inline-grid;
+                    grid-template-columns: auto auto;
+                    grid-gap: ${1 * GU}px;
+                    align-items: center;
+                    color: ${theme.surfaceContentSecondary};
+                    ${textStyle("body2")};
+                  `}
+                >
+                  <IconTime size="small" />
+                  {lastTimeVotedYes
+                    ? formatDate(lastTimeVotedYes)
+                    : "No record"}
+                </div>
+              </React.Fragment>
+            </Box>
+          </React.Fragment>
+        }
+      />
     </React.Fragment>
   );
 });

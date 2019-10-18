@@ -22,7 +22,6 @@ function useDecoratedVotes() {
   const { votes, connectedAccountVotes } = useAppState();
   const currentApp = useCurrentApp();
   const installedApps = useInstalledApps();
-  console.log("Installed apps ", installedApps);
 
   return useMemo(() => {
     if (!votes) {

@@ -38,9 +38,6 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
 
   const hasVoted = [VOTE_YEA, VOTE_NAY].includes(connectedAccountVote);
 
-  console.log("canUserVote ", canUserVote);
-  console.log("hasVoted ", hasVoted);
-
   useEffect(() => {
     let cancelled = false;
 
