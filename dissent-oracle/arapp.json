@@ -4,7 +4,7 @@
       "name": "Set the dissent window",
       "id": "SET_DISSENT_WINDOW_ROLE",
       "params": []
-    }, ,
+    },
     {
       "name": "Set the dandelion voting address",
       "id": "SET_DANDELION_VOTING_ROLE",
@@ -15,6 +15,12 @@
     "default": {
       "network": "development",
       "appName": "dissent-oracle.open.aragonpm.eth"
+    },
+    "staging": {
+      "registry": "0x98df287b6c145399aaa709692c8d308357bc085d",
+      "appName": "dissent-oracle-staging.open.aragonpm.eth",
+      "wsRPC": "wss://rinkeby.eth.aragon.network/ws",
+      "network": "rinkeby"
     },
     "rinkeby": {
       "registry": "0x98df287b6c145399aaa709692c8d308357bc085d",
