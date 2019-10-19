@@ -1,20 +1,6 @@
 {
-  "name": "dissent-oracle",
+  "name": "@1hive/oracle-dissent",
   "version": "1.0.0",
-  "description": "",
-  "dependencies": {
-    "@aragon/apps-shared-minime": "^1.0.2",
-    "@aragon/os": "^4.2.1",
-    "bn.js": "^5.0.0"
-  },
-  "devDependencies": {
-    "@aragon/cli": "^6.0.0",
-    "@aragon/test-helpers": "^2.0.0",
-    "cross-env": "^5.2.0",
-    "eth-ens-namehash": "^2.0.8",
-    "parcel-bundler": "^1.11.0",
-    "truffle": "4.1.14"
-  },
   "scripts": {
     "prepublishOnly": "aragon contracts compile",
     "start": "aragon run --files dist",
@@ -27,8 +13,29 @@
     "publish:patch": "aragon apm publish patch --files dist",
     "publish:minor": "aragon apm publish minor --files dist",
     "publish:major": "aragon apm publish major --files dist",
+    "deploy:staging": "npm run publish:major -- --environment staging",
     "versions": "aragon apm versions",
     "ganache-cli:test": "sh ./node_modules/@aragon/test-helpers/ganache-cli.sh"
   },
-  "keywords": []
+  "files": [
+    "/arapp.json",
+    "/build",
+    "/contracts",
+    "/test"
+  ],
+  "keywords": [],
+  "description": "Prevent engagement when a user has recently voted in favour of proposals",
+  "devDependencies": {
+    "@aragon/cli": "^6.0.0",
+    "@aragon/test-helpers": "^2.0.0",
+    "cross-env": "^5.2.0",
+    "eth-ens-namehash": "^2.0.8",
+    "parcel-bundler": "^1.11.0",
+    "truffle": "4.1.14"
+  },
+  "dependencies": {
+    "@aragon/apps-shared-minime": "^1.0.2",
+    "@aragon/os": "^4.2.1",
+    "bn.js": "^5.0.0"
+  }
 }
