@@ -14,7 +14,7 @@ The code in this repo has not been audited.
 
 The Dissent Oracle is initialized with a dissent window. The dissent window is the window of time in which an account cannot dissent (exit the Dandelion Org) if they have performed an action (such as voting `yes` for a proposal). The Dandelion Voting app queries the Dissent Oracle to check if an account voted `yes` within the dissent window. In the context of Dandelion Orgs this is used to check if an account can or cannot redeem tokens from the Redemptions app.
 
-> Note: on a technical level the dissent oracle really just initializes a time window and then checks a voting app to see if votes happened within that window. This could be setup with a regular voting app, and depending on the app that calls it the boolean it returns could be used to approve _or_ deny actions (not limited to dissenting type activities!).
+> Note: this will not work with the regular Aragon voting application because it does not track the last block in which a voter voted yea.
 
 ## Initialization
 
@@ -32,6 +32,10 @@ The Dissent Oracle does not have an interface. It is meant as a back-end helper 
 ## How to run locally
 
 The dissent Oracle must be installed in the context of a DAO that has a voting app. An example of this can be found in the [Danelion Voting app README](https://github.com/1Hive/dissent-voting-app/tree/master/dandelion-voting).
+
+## Installing to an Aragon DAO
+
+TBD
 
 ## Contributing
 
