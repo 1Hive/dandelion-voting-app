@@ -51,9 +51,9 @@
     "prepare": "cd app && npm install && cd ..",
     "start:app": "cd app && npm start && cd ..",
     "prepublishOnly": "aragon contracts compile",
-    "publish:patch": "aragon apm publish patch",
-    "publish:minor": "aragon apm publish minor",
-    "publish:major": "aragon apm publish major",
+    "publish:patch": "aragon apm publish patch --files dist",
+    "publish:minor": "aragon apm publish minor --files dist",
+    "publish:major": "aragon apm publish major --files dist",
     "deploy:staging": "npm run publish:major -- --environment staging",
     "versions": "aragon apm versions",
     "lint": "eslint . & solium --dir ./contracts",
@@ -63,5 +63,11 @@
     "ganache-cli:test": "sh ./node_modules/@aragon/test-helpers/ganache-cli.sh",
     "test": "cross-env TRUFFLE_TEST=true npm run ganache-cli:test"
   },
+  "files": [
+    "/arapp.json",
+    "/build",
+    "/contracts",
+    "/test"
+  ],
   "keywords": []
 }

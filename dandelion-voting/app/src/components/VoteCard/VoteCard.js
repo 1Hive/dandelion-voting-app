@@ -134,7 +134,6 @@ const VoteCard = ({ vote, onOpen }) => {
           <div
             css={`
               display: flex;
-              justify-content: space-between;
             `}
           >
             {endDate && <Timer end={endDate} maxUnits={4} />}

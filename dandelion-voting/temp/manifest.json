@@ -3,8 +3,8 @@
   "description": "Voting app for dandelion  orgs",
   "icons": [
     {
-      "src": "/meta/icon.svg",
-      "sizes": "56x56"
+      "src": "/images/icon.png",
+      "sizes": "192x192"
     }
   ],
   "start_url": "/index.html",
