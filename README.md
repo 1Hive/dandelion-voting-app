@@ -15,7 +15,7 @@ The code in this repo has not been audited.
 
 ## How does it work?
 
-Details on the mechanics of the [Dandelion Voting]() and [Dissent Oracle]() apps can be found in the README of each app:
+Details on the mechanics of the Dandelion Voting and Dissent Oracle apps can be found in the README of each app:
 - [Dandelion Voting README](https://github.com/1Hive/dissent-voting-app/tree/master/dandelion-voting/README.md)
 - [Dissent Oracle README](https://github.com/1Hive/dissent-voting-app/tree/master/dissent-oracle/README.md)
 
