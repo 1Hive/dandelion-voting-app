@@ -18,7 +18,7 @@ The Dissent Oracle is initialized with a dissent window. The dissent window is t
 
 ## Initialization
 
-The Dissent Oracle app is initialized with an `address _dandelionVoting` and `uint64 _dissentWindowBlocks`. The `address _dandelionVoting` is the address of the voting app that the Dissent Oracle is to query. The `uint64 _dissentWindowBlocks` is the time window within which the dissent oracle should return a boolean.
+The Dissent Oracle app is initialized with an `address _dandelionVoting` and `uint64 _dissentWindowBlocks`. The `address _dandelionVoting` is the address of the voting app that the Dissent Oracle is to query. The `uint64 _dissentWindowBlocks` is the time window which the dissent oracle tracks. The dissent oracle then returns a true if an address has voted `yay` in the `address _dandelionVoting` app within the time window.
 
 ## Roles
 The Dissent Oracle app should implement the following roles:
