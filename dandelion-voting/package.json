@@ -1,7 +1,35 @@
 {
-  "name": "dandelion-voting",
+  "name": "@1hive/apps-dandelion-voting",
   "version": "1.0.0",
-  "description": "",
+  "scripts": {
+    "start": "aragon run",
+    "start:template": "npm run start -- --template Template --template-init @ARAGON_ENS --files dist",
+    "start:http": "aragon run --http localhost:8001 --http-served-from ./dist",
+    "start:http:template": "npm run start:http -- --template Template --template-init @ARAGON_ENS",
+    "build": "cd app && npm run build && cd ..",
+    "prepare": "cd app && npm install && cd ..",
+    "start:app": "cd app && npm start && cd ..",
+    "prepublishOnly": "aragon contracts compile",
+    "publish:patch": "aragon apm publish patch --files dist",
+    "publish:minor": "aragon apm publish minor --files dist",
+    "publish:major": "aragon apm publish major --files dist",
+    "deploy:staging": "npm run publish:major -- --environment staging",
+    "versions": "aragon apm versions",
+    "lint": "eslint . & solium --dir ./contracts",
+    "lint:fix": "eslint . --fix & solium --dir ./contracts --fix",
+    "coverage": "cross-env SOLIDITY_COVERAGE=true npm run ganache-cli:test",
+    "coveralls": "cat ./coverage/lcov.info | npx coveralls",
+    "ganache-cli:test": "sh ./node_modules/@aragon/test-helpers/ganache-cli.sh",
+    "test": "cross-env TRUFFLE_TEST=true npm run ganache-cli:test"
+  },
+  "files": [
+    "/arapp.json",
+    "/build",
+    "/contracts",
+    "/test"
+  ],
+  "keywords": [],
+  "description": "Voting app for dandelion orgs",
   "dependencies": {
     "@aragon/apps-token-manager": "^2.1.0",
     "@aragon/apps-vault": "^4.1.0",
