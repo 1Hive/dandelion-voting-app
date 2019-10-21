@@ -12,7 +12,7 @@ The code in this repo has not been audited.
 
 ## How does it work?
 
-The Dissent Oracle is initialized with a dissent window. The dissent window is the window of time in which an account cannot dissent (exit the Dandelion Org) if they have performed an action (such as voting `yes` for a proposal). The Dandelion Voting app queries the Dissent Oracle to check if an account voted `yes` within the dissent window. In the context of Dandelion Orgs this is used to check if an account can or cannot redeem tokens from the Redemptions app.
+The Dissent Oracle is initialized with a dissent window. The dissent window is the window of time in which an account cannot dissent (exit the Dandelion Org) if they have performed an action (such as voting `yes` for a proposal). The Dandelion Voting app queries the Dissent Oracle (through the ACL) to check if an account voted `yes` within the dissent window. In the context of Dandelion Orgs this is used to check if an account can or cannot redeem tokens from the Redemptions app.
 
 > Note: this will not work with the regular Aragon voting application because it does not track the last block in which a voter voted yea.
 
