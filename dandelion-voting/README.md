@@ -11,7 +11,7 @@ The Dandelion Voting app is a fork of the [Aragon Voting app](https://github.com
 
 #### 🐲 Project stage: development
 
-The Dandelion Voting app is still under development. If you are interested in contributing please see our open [issues](https://github.com/1hive/time-lock-app/issues).
+The Dandelion Voting app is still under development. If you are interested in contributing please see our open [issues](https://github.com/1Hive/dissent-voting-app/issues).
 
 #### 🚨 Security review status: pre-audit
 
