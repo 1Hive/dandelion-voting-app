@@ -4,7 +4,7 @@ The Dissent Oracle app is an [ACL Oracle](https://hack.aragon.org/docs/acl_IACLO
 
 #### 🐲 Project stage: development
 
-The Time Lock app is still in development, a first implementation was published to `time-lock.open.aragonpm.eth`. If you are interested in contributing please see our open [issues](https://github.com/1hive/time-lock-app/issues).
+The Time Lock app is still in development. If you are interested in contributing please see our open [issues](https://github.com/1hive/dissent-voting-app/issues).
 
 #### 🚨 Security review status: pre-audit
 
