@@ -3,7 +3,7 @@ pragma solidity ^0.4.24;
 import "@aragon/os/contracts/apps/AragonApp.sol";
 import "@aragon/os/contracts/acl/IACLOracle.sol";
 import "@aragon/os/contracts/lib/math/SafeMath64.sol";
-import "../../dandelion-voting/contracts/DandelionVoting.sol";
+import "@1hive/apps-dandelion-voting/contracts/DandelionVoting.sol";
 
 contract DissentOracle is AragonApp, IACLOracle {
 
