@@ -7,9 +7,7 @@
     "test": "cross-env TRUFFLE_TEST=true npm run ganache-cli:test",
     "compile": "aragon contracts compile",
     "deploy": "aragon deploy",
-    "build:app": "parcel build app/index.html -d dist/ --public-url \".\" --no-cache",
-    "build:script": "parcel build app/script.js -d dist/ --no-cache",
-    "build": "npm run build:app && npm run build:script",
+    "build": "rsync -rtu ./public/ ./dist",
     "publish:patch": "aragon apm publish patch --files dist",
     "publish:minor": "aragon apm publish minor --files dist",
     "publish:major": "aragon apm publish major --files dist",
@@ -26,6 +24,7 @@
   "keywords": [],
   "description": "Prevent engagement when a user has recently voted in favour of proposals",
   "devDependencies": {
+    "@1hive/apps-dandelion-voting": "^1.0.0",
     "@aragon/cli": "^6.0.0",
     "@aragon/test-helpers": "^2.0.0",
     "cross-env": "^5.2.0",
