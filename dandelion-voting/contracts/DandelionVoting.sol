@@ -21,6 +21,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     bytes32 public constant MODIFY_SUPPORT_ROLE = keccak256("MODIFY_SUPPORT_ROLE");
     bytes32 public constant MODIFY_QUORUM_ROLE = keccak256("MODIFY_QUORUM_ROLE");
     bytes32 public constant MODIFY_BUFFER_BLOCKS_ROLE = keccak256("MODIFY_BUFFER_BLOCKS_ROLE");
+    bytes32 public constant MODIFY_EXECUTION_DELAY_ROLE = keccak256("MODIFY_EXECUTION_DELAY_ROLE");
 
     uint64 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10^16; 100% = 10^18
 
@@ -40,6 +41,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     struct Vote {
         bool executed;
         uint64 startBlock;
+        uint64 executionBlock;
         uint64 snapshotBlock;
         uint64 supportRequiredPct;
         uint64 minAcceptQuorumPct;
@@ -54,6 +56,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     uint64 public minAcceptQuorumPct;
     uint64 public voteDurationBlocks;
     uint64 public voteBufferBlocks;
+    uint64 public executionDelayBlocks;
 
     // We are mimicing an array, we use a mapping instead to make app upgrade more graceful
     mapping (uint256 => Vote) internal votes;
@@ -66,6 +69,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     event ChangeSupportRequired(uint64 supportRequiredPct);
     event ChangeMinQuorum(uint64 minAcceptQuorumPct);
     event ChangeVoteBufferBlocks(uint64 voteBufferBlocks);
+    event ChangeExecutionDelayBlocks(uint64 executionDelayBlocks);
 
     modifier voteExists(uint256 _voteId) {
         require(_voteId < votesLength, ERROR_NO_VOTE);
@@ -79,8 +83,16 @@ contract DandelionVoting is IForwarder, AragonApp {
     * @param _minAcceptQuorumPct Percentage of yeas in total possible votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
     * @param _voteDurationBlocks Blocks that a vote will be open for token holders to vote
     * @param _voteBufferBlocks Minimum number of blocks between the start block of each vote
+    * @param _executionDelayBlocks Minimum number of blocks between the end of a vote and when it can be executed
     */
-    function initialize(MiniMeToken _token, uint64 _supportRequiredPct, uint64 _minAcceptQuorumPct, uint64 _voteDurationBlocks, uint64 _voteBufferBlocks)
+    function initialize(
+        MiniMeToken _token,
+        uint64 _supportRequiredPct,
+        uint64 _minAcceptQuorumPct,
+        uint64 _voteDurationBlocks,
+        uint64 _voteBufferBlocks,
+        uint64 _executionDelayBlocks
+    )
         external
         onlyInit
     {
@@ -94,6 +106,7 @@ contract DandelionVoting is IForwarder, AragonApp {
         minAcceptQuorumPct = _minAcceptQuorumPct;
         voteDurationBlocks = _voteDurationBlocks;
         voteBufferBlocks = _voteBufferBlocks;
+        executionDelayBlocks = _executionDelayBlocks;
     }
 
     /**
@@ -132,6 +145,15 @@ contract DandelionVoting is IForwarder, AragonApp {
     function changeVoteBufferBlocks(uint64 _voteBufferBlocks) external auth(MODIFY_BUFFER_BLOCKS_ROLE) {
         voteBufferBlocks = _voteBufferBlocks;
         emit ChangeVoteBufferBlocks(_voteBufferBlocks);
+    }
+
+    /**
+    * @notice Change execution delay to `_executionDelayBlocks` blocks
+    * @param _executionDelayBlocks New vote execution delay defined in blocks
+    */
+    function changeExecutionDelayBlocks(uint64 _executionDelayBlocks) external auth(MODIFY_EXECUTION_DELAY_ROLE) {
+        executionDelayBlocks = _executionDelayBlocks;
+        emit ChangeExecutionDelayBlocks(_executionDelayBlocks);
     }
 
     /**
@@ -247,6 +269,7 @@ contract DandelionVoting is IForwarder, AragonApp {
             bool open,
             bool executed,
             uint64 startBlock,
+            uint64 executionBlock,
             uint64 snapshotBlock,
             uint64 supportRequired,
             uint64 minAcceptQuorum,
@@ -260,6 +283,7 @@ contract DandelionVoting is IForwarder, AragonApp {
         open = _isVoteOpen(vote_);
         executed = vote_.executed;
         startBlock = vote_.startBlock;
+        executionBlock = vote_.executionBlock;
         snapshotBlock = vote_.snapshotBlock;
         supportRequired = vote_.supportRequiredPct;
         minAcceptQuorum = vote_.minAcceptQuorumPct;
@@ -290,8 +314,11 @@ contract DandelionVoting is IForwarder, AragonApp {
         uint64 earliestStartBlock = previousVoteStartBlock == 1 ? 1 : previousVoteStartBlock.add(voteBufferBlocks);
         uint64 startBlock = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
 
+        uint64 executionBlock = startBlock.add(voteDurationBlocks).add(executionDelayBlocks);
+
         Vote storage vote_ = votes[voteId];
         vote_.startBlock = startBlock;
+        vote_.executionBlock = executionBlock;
         vote_.snapshotBlock = startBlock - 1; // avoid double voting in this very block
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
@@ -355,30 +382,37 @@ contract DandelionVoting is IForwarder, AragonApp {
         Vote storage vote_ = votes[_voteId];
         uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
 
-        if (_isVoteOpen(vote_)) {
-            return false;
-        }
-
         if (vote_.executed) {
             return false;
         }
 
-        // Voting is already decided
-        if (_isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.supportRequiredPct)) {
-            return true;
+        if (getBlockNumber64() < vote_.executionBlock) {
+            return false;
         }
 
-        // Has enough support?
+        // Votes must be executed in the order they are created
+        if (_voteId > 0) {
+            Vote storage previousVote_ = votes[_voteId.sub(1)];
+            if (_votePassed(previousVote_) && !previousVote_.executed) {
+                return false;
+            }
+        }
+
+        return _votePassed(vote_);
+    }
+
+    /**
+    * @dev Internal function to check if a vote has passed. It assumes the vote period has passed.
+    * @return True if the given vote has passed, false otherwise.
+    */
+    function _votePassed(Vote storage vote_) internal view returns (bool) {
         uint256 totalVotes = vote_.yea.add(vote_.nay);
-        if (!_isValuePct(vote_.yea, totalVotes, vote_.supportRequiredPct)) {
-            return false;
-        }
-        // Has min quorum?
-        if (!_isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.minAcceptQuorumPct)) {
-            return false;
-        }
+        uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
 
-        return true;
+        bool hasSupportRequired = _isValuePct(vote_.yea, totalVotes, vote_.supportRequiredPct);
+        bool hasMinQuorum = _isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.minAcceptQuorumPct);
+
+        return hasSupportRequired && hasMinQuorum;
     }
 
     /**
