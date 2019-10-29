@@ -457,46 +457,49 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     assert.equal(newVoteSnapshotBlock, expectedVoteStartBlock - 1)
                 })
 
-                it("last yea vote block for voter set to start block of vote voted for", async () => {
-                    const [_isOpen, _isExecuted, startBlock] = await voting.getVote(voteId)
+                it('increments voteId by 1 for each new vote', async () => {
+                    const secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder20 }))
+                    const thirdVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder20 }))
 
-                    await voting.vote(voteId, true, { from: holder29 })
-
-                    const actualLastYeaBlock = await voting.lastYeaVoteBlock(holder29)
-                    assert.equal(actualLastYeaBlock.toString(), startBlock.toString())
+                    assert.equal(voteId, 0)
+                    assert.equal(secondVoteId, 1)
+                    assert.equal(thirdVoteId, 2)
                 })
 
-                describe("last yea vote on second vote", () => {
+                it("last yea vote id for voter set to start block of vote voted for", async () => {
+                    await voting.vote(voteId, true, { from: holder29 })
 
-                    let secondVoteId, secondVoteStartBlock
+                    const actualLastYeaVoteId = await voting.lastYeaVoteId(holder29)
+                    assert.equal(actualLastYeaVoteId.toString(), voteId.toString())
+                })
+
+                describe("last yea voteId on second vote", () => {
+
+                    let secondVoteId
 
                     beforeEach(async () => {
                         await voting.mockAdvanceBlocks(120)
-                        const receipt = await voting.newVote(script, 'metadata', false, { from: holder20 });
-                        secondVoteId = getEventArgument(receipt, 'StartVote', 'voteId')
-                        secondVoteStartBlock = (await voting.getVote(secondVoteId))[2]
+                        secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder20 }))
                     })
 
                     it("updates when voting on a second vote", async () => {
                         await voting.vote(voteId, true, { from: holder29 })
-                        const [_isOpen, _isExecuted, firstVoteStartBlock] = await voting.getVote(voteId)
 
                         await voting.vote(secondVoteId, true, { from: holder29 })
 
-                        const actualLastYeaBlock = await voting.lastYeaVoteBlock(holder29)
-                        assert.equal(actualLastYeaBlock.toString(), secondVoteStartBlock.toString())
-                        assert.notEqual(actualLastYeaBlock.toString(), firstVoteStartBlock.toString())
+                        const actualLastYeaVoteId = await voting.lastYeaVoteId(holder29)
+                        assert.equal(actualLastYeaVoteId.toString(), secondVoteId.toString())
+                        assert.notEqual(actualLastYeaVoteId.toString(), voteId.toString())
                     })
 
-                    it("doesn't update when second vote start block before voted on vote start block", async () => {
+                    it("doesn't update when second voteId less than voted on voteId", async () => {
                         await voting.vote(secondVoteId, true, { from: holder29 })
-                        const [_isOpen, _isExecuted, firstVoteStartBlock] = await voting.getVote(voteId)
 
                         await voting.vote(voteId, true, { from: holder29 })
 
-                        const actualLastYeaBlock = await voting.lastYeaVoteBlock(holder29)
-                        assert.equal(actualLastYeaBlock.toString(), secondVoteStartBlock.toString())
-                        assert.notEqual(actualLastYeaBlock.toString(), firstVoteStartBlock.toString())
+                        const actualLastYeaBlock = await voting.lastYeaVoteId(holder29)
+                        assert.equal(actualLastYeaBlock.toString(), secondVoteId.toString())
+                        assert.notEqual(actualLastYeaBlock.toString(), voteId.toString())
                     })
                 })
             })

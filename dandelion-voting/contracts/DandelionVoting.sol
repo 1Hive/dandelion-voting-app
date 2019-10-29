@@ -6,6 +6,7 @@ pragma solidity 0.4.24;
 
 import "@aragon/os/contracts/apps/AragonApp.sol";
 import "@aragon/os/contracts/common/IForwarder.sol";
+import "@aragon/os/contracts/acl/IACLOracle.sol";
 
 import "@aragon/os/contracts/lib/math/SafeMath.sol";
 import "@aragon/os/contracts/lib/math/SafeMath64.sol";
@@ -61,7 +62,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     // We are mimicing an array, we use a mapping instead to make app upgrade more graceful
     mapping (uint256 => Vote) internal votes;
     uint256 public votesLength;
-    mapping (address => uint64) public lastYeaVoteBlock;
+    mapping (address => uint256) public lastYeaVoteId;
 
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
@@ -345,7 +346,7 @@ contract DandelionVoting is IForwarder, AragonApp {
 
         if (_supports) {
             vote_.yea = vote_.yea.add(voterStake);
-            lastYeaVoteBlock[_voter] = lastYeaVoteBlock[_voter] < vote_.startBlock ? vote_.startBlock : lastYeaVoteBlock[_voter];
+            lastYeaVoteId[_voter] = lastYeaVoteId[_voter] < _voteId ? _voteId : lastYeaVoteId[_voter];
         } else {
             vote_.nay = vote_.nay.add(voterStake);
         }
