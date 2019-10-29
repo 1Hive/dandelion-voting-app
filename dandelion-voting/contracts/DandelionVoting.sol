@@ -338,7 +338,10 @@ contract DandelionVoting is IForwarder, AragonApp {
         Vote storage vote_ = votes[_voteId];
 
         // This could re-enter, though we can assume the governance token is not malicious
-        uint256 voterStake = token.balanceOfAt(_voter, vote_.snapshotBlock);
+        uint256 balanceAtSnapshot = token.balanceOfAt(_voter, vote_.snapshotBlock);
+        uint256 currentBalance = token.balanceOf(_voter);
+
+        uint256 voterStake = balanceAtSnapshot < currentBalance ? balanceAtSnapshot : currentBalance;
 
         if (_supports) {
             vote_.yea = vote_.yea.add(voterStake);

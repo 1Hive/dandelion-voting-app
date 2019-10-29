@@ -274,6 +274,18 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     await voting.executeVote(voteId) // exec doesn't fail
                 })
 
+                it('changing delay blocks doesnt affect vote delay blocks', async () => {
+                    await voting.changeExecutionDelayBlocks(30)
+
+                    await voting.vote(voteId, true, { from: holder29 })
+                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+
+                    const state = await voting.getVote(voteId)
+                    const expectedExecutionBlock = state[2].toNumber() + executionDelayBlocks + voteDurationBlocks
+                    assert.equal(state[3].toString(), expectedExecutionBlock.toString(), 'execution blocks in vote should not change')
+                    await voting.executeVote(voteId) // exec doesn't fail
+                })
+
                 it('holder can vote', async () => {
                     await voting.vote(voteId, false, { from: holder29 })
                     const state = await voting.getVote(voteId)
@@ -283,14 +295,26 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     assert.equal(voterState, VOTER_STATE.NAY, 'holder29 should have nay voter status')
                 })
 
-                it('token transfers dont affect voting', async () => {
-                    await token.transfer(nonHolder, bigExp(29, decimals), { from: holder29 })
+                it('uses snapshot balance as vote weight when balance increases after vote start', async () => {
+                    await token.generateTokens(holder29, bigExp(1, decimals))
 
                     await voting.vote(voteId, true, { from: holder29 })
                     const state = await voting.getVote(voteId)
 
-                    assert.equal(state[7].toString(), bigExp(29, decimals).toString(), 'yea vote should have been counted')
-                    assert.equal(await token.balanceOf(holder29), 0, 'balance should be 0 at current block')
+                    const currentBalance = await token.balanceOf(holder29)
+                    assert.equal(state[7].toString(), bigExp(29, decimals).toString(), 'snapshot balance should have been added')
+                    assert.equal(currentBalance.toNumber(), bigExp(30, decimals).toNumber(), 'balance should be 49 at current block')
+                })
+
+                it('uses current balance as vote weight when balance decreases after vote start', async () => {
+                    await token.transfer(nonHolder, bigExp(1, decimals), { from: holder29 })
+
+                    await voting.vote(voteId, true, { from: holder29 })
+                    const state = await voting.getVote(voteId)
+
+                    const currentBalance = await token.balanceOf(holder29)
+                    assert.equal(state[7].toString(), bigExp(28, decimals).toString(), 'snapshot balance should have been added')
+                    assert.equal(currentBalance.toNumber(), bigExp(28, decimals).toNumber(), 'balance should be 28 at current block')
                 })
 
                 it('throws when non-holder votes', async () => {
