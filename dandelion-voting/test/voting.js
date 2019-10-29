@@ -226,7 +226,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     assert.isTrue(isOpen, 'vote should be open')
                     assert.isFalse(isExecuted, 'vote should not be executed')
                     assert.equal(startBlock.toString(), await getBlockNumber(), 'start block should be correct')
-                    assert.equal(executionBlock.toString(), startBlock.toNumber() + executionDelayBlocks + voteDurationBlocks)
+                    assert.equal(executionBlock.toString(), startBlock.toNumber() + executionDelayBlocks + voteDurationBlocks, 'execution block should be correct')
                     assert.equal(creator, holder51, 'creator should be correct')
                     assert.equal(snapshotBlock.toString(), await getBlockNumber() - 1, 'snapshot block should be correct')
                     assert.equal(supportRequired.toString(), neededSupport.toString(), 'required support should be app required support')
