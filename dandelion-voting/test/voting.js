@@ -204,7 +204,11 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 const action = { to: executionTarget.address, calldata: executionTarget.contract.execute.getData() }
                 const script = encodeCallScript([action])
                 const voteId = createdVoteId(await voting.forward(script, { from: holder51 }))
-                assert.equal(voteId, 0, 'voting should have been created')
+                assert.equal(voteId, 1, 'voting should have been created')
+            })
+
+            it('ACLOracle canPerform() returns true when no votes have been created', async () => {
+                assert.isTrue(await voting.canPerform(holder1, ANY_ADDR, "", []))
             })
 
             context('creating vote', () => {
@@ -461,16 +465,23 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     const secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder20 }))
                     const thirdVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder20 }))
 
-                    assert.equal(voteId, 0)
-                    assert.equal(secondVoteId, 1)
-                    assert.equal(thirdVoteId, 2)
+                    assert.equal(voteId, 1)
+                    assert.equal(secondVoteId, 2)
+                    assert.equal(thirdVoteId, 3)
                 })
 
-                it("last yea vote id for voter set to start block of vote voted for", async () => {
+                it("last yea vote id for voter set to voteId of vote voted for", async () => {
                     await voting.vote(voteId, true, { from: holder29 })
 
                     const actualLastYeaVoteId = await voting.lastYeaVoteId(holder29)
                     assert.equal(actualLastYeaVoteId.toString(), voteId.toString())
+                })
+
+                it("last yea vote id for voter not set when voted against", async () => {
+                    await voting.vote(voteId, false, { from: holder29 })
+
+                    const actualLastYeaVoteId = await voting.lastYeaVoteId(holder29)
+                    assert.equal(actualLastYeaVoteId.toString(), 0)
                 })
 
                 describe("last yea voteId on second vote", () => {
@@ -478,8 +489,8 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     let secondVoteId
 
                     beforeEach(async () => {
-                        await voting.mockAdvanceBlocks(120)
-                        secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder20 }))
+                        await voting.mockAdvanceBlocks(bufferBlocks)
+                        secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false))
                     })
 
                     it("updates when voting on a second vote", async () => {
@@ -500,6 +511,105 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                         const actualLastYeaBlock = await voting.lastYeaVoteId(holder29)
                         assert.equal(actualLastYeaBlock.toString(), secondVoteId.toString())
                         assert.notEqual(actualLastYeaBlock.toString(), voteId.toString())
+                    })
+                })
+
+                describe('ACLOracle canPerform()', () => {
+
+                    it('returns true when not voted in most recent vote', async () => {
+                        assert.isTrue(await voting.canPerform(holder29, ANY_ADDR, "", []))
+                    })
+
+                    it('returns true when voted nay on most recent vote', async () => {
+                        await voting.vote(voteId, false, { from: holder29 })
+
+                        assert.isTrue(await voting.canPerform(holder29, ANY_ADDR, "", []))
+                    })
+
+                    it('returns true when voted yea on most recent vote and vote finished but failed', async () => {
+                        await voting.vote(voteId, true, { from: holder20 })
+                        await voting.vote(voteId, false, { from: holder29 })
+                        await voting.mockAdvanceBlocks(voteDurationBlocks)
+
+                        assert.isTrue(await voting.canPerform(holder20, ANY_ADDR, "", []))
+                    })
+
+                    it('returns true when voted yea on most recent vote and vote finished and executed', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                        await voting.executeVote(voteId)
+
+                        assert.isTrue(await voting.canPerform(holder29, ANY_ADDR, "", []))
+                    })
+
+                    it('returns false when voted yea on most recent vote and vote finished but not executed', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+
+                        assert.isFalse(await voting.canPerform(holder29, ANY_ADDR, "", []))
+                    })
+
+                    it('returns false when voted yea on most recent vote and vote open', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+
+                        assert.isFalse(await voting.canPerform(holder29, ANY_ADDR, "", []))
+                    })
+
+                    it('returns false when voted nay on first vote and yea on second vote', async () => {
+                        await voting.vote(voteId, false, { from: holder29 })
+                        assert.isTrue(await voting.canPerform(holder29, ANY_ADDR, "", []))
+
+                        voting.mockAdvanceBlocks(bufferBlocks)
+                        const secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false))
+                        await voting.vote(secondVoteId, true, { from: holder29 })
+
+                        assert.isFalse(await voting.canPerform(holder29, ANY_ADDR, "", []))
+                    })
+
+                    it('returns true when voted yea on first vote and new vote created', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        assert.isFalse(await voting.canPerform(holder29, ANY_ADDR, "", []))
+
+                        voting.mockAdvanceBlocks(bufferBlocks)
+                        createdVoteId(await voting.newVote(script, 'metadata', false))
+
+                        assert.isTrue(await voting.canPerform(holder29, ANY_ADDR, "", []))
+                    })
+
+                    it('returns true when voted yea on first vote and nay on second vote', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        assert.isFalse(await voting.canPerform(holder29, ANY_ADDR, "", []))
+
+                        voting.mockAdvanceBlocks(bufferBlocks)
+                        const secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false))
+                        await voting.vote(secondVoteId, false, { from: holder29 })
+
+                        assert.isTrue(await voting.canPerform(holder29, ANY_ADDR, "", []))
+                    })
+
+                    it('returns false when voted yea on most recent vote and address passed as param', async () => {
+                        await voting.vote(voteId, false, { from: holder20 })
+                        await voting.vote(voteId, true, { from: holder29 })
+
+                        // The following assert is to demonstrate that holder20 is not used
+                        // when evaluating canPerform() when passing address via param.
+                        assert.isTrue(await voting.canPerform(holder20, ANY_ADDR, "", []))
+
+                        assert.isFalse(await voting.canPerform(holder20, ANY_ADDR, "", [holder29]))
+                    })
+
+                    it('returns true when voted yea on most recent executed vote and address passed as param', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                        await voting.executeVote(voteId)
+
+                        // The following is to demonstrate that holder20 is not used when
+                        // evaluating canPerform() when passing address via param.
+                        const secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false, { from: holder20 }))
+                        await voting.vote(secondVoteId, true, { from: holder20 })
+                        assert.isFalse(await voting.canPerform(holder20, ANY_ADDR, "", []))
+
+                        assert.isTrue(await voting.canPerform(holder20, ANY_ADDR, "", [holder29]))
                     })
                 })
             })

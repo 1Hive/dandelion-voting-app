@@ -14,7 +14,7 @@ import "@aragon/os/contracts/lib/math/SafeMath64.sol";
 import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 
 
-contract DandelionVoting is IForwarder, AragonApp {
+contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     using SafeMath for uint256;
     using SafeMath64 for uint64;
 
@@ -73,7 +73,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     event ChangeExecutionDelayBlocks(uint64 executionDelayBlocks);
 
     modifier voteExists(uint256 _voteId) {
-        require(_voteId < votesLength, ERROR_NO_VOTE);
+        require(_voteId <= votesLength, ERROR_NO_VOTE);
         _;
     }
 
@@ -197,7 +197,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     // Forwarding fns
 
     /**
-    * @notice Tells whether the Voting app is a forwarder or not
+    * @notice Returns whether the Voting app is a forwarder or not
     * @dev IForwarder interface conformance
     * @return Always true
     */
@@ -216,7 +216,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     }
 
     /**
-    * @notice Tells whether `_sender` can forward actions or not
+    * @notice Returns whether `_sender` can forward actions or not
     * @dev IForwarder interface conformance
     * @param _sender Address of the account intending to forward an action
     * @return True if the given address can create votes, false otherwise
@@ -224,6 +224,31 @@ contract DandelionVoting is IForwarder, AragonApp {
     function canForward(address _sender, bytes) public view returns (bool) {
         // Note that `canPerform()` implicitly does an initialization check itself
         return canPerform(_sender, CREATE_VOTES_ROLE, arr());
+    }
+
+    // ACL Oracle fns
+
+    /**
+    * @notice Returns whether the sender has voted on the most recent open vote or closed unexecuted vote.
+    * @dev IACLOracle interface conformance. The ACLOracle permissioned function should specify the sender
+    *      with 'authP(SOME_ACL_ROLE, arr(sender))', where sender is typically set to 'msg.sender'.
+    * @param _who The address to check if can perform (ignored if `_how` contains an address)
+    * @param _how Array passed by Kernel when using 'authP()'. First item should be the address to check can perform.
+    * return True if the sender has not voted on the most recent open vote or closed unexecuted vote, false if they have.
+    */
+    function canPerform(address _who, address, bytes32, uint256[] _how) external view returns (bool) {
+        if (votesLength == 0) {
+            return true;
+        }
+
+        Vote storage latestVote = votes[votesLength];
+        address sender = _how.length > 0 ? address(_how[0]) : _who;
+
+        bool senderNotVotedOnLatestVote = lastYeaVoteId[sender] != votesLength;
+        bool latestVoteFinished = getBlockNumber64() > latestVote.startBlock.add(voteDurationBlocks);
+        bool latestVoteFailed = !_votePassed(latestVote);
+
+        return senderNotVotedOnLatestVote || (latestVoteFinished && (latestVoteFailed || latestVote.executed));
     }
 
     // Getter fns
@@ -309,10 +334,10 @@ contract DandelionVoting is IForwarder, AragonApp {
     * @return voteId id for newly created vote
     */
     function _newVote(bytes _executionScript, string _metadata, bool _castVote) internal returns (uint256 voteId) {
-        voteId = votesLength++;
+        voteId = ++votesLength; // Increment votesLength before assigning to votedId. The first voteId is 1.
 
-        uint64 previousVoteStartBlock = voteId == 0 ? 1 : votes[voteId - 1].startBlock;
-        uint64 earliestStartBlock = previousVoteStartBlock == 1 ? 1 : previousVoteStartBlock.add(voteBufferBlocks);
+        uint64 previousVoteStartBlock = votes[voteId - 1].startBlock;
+        uint64 earliestStartBlock = previousVoteStartBlock == 0 ? 0 : previousVoteStartBlock.add(voteBufferBlocks);
         uint64 startBlock = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
 
         uint64 executionBlock = startBlock.add(voteDurationBlocks).add(executionDelayBlocks);
