@@ -303,7 +303,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
                     const currentBalance = await token.balanceOf(holder29)
                     assert.equal(state[7].toString(), bigExp(29, decimals).toString(), 'snapshot balance should have been added')
-                    assert.equal(currentBalance.toNumber(), bigExp(30, decimals).toNumber(), 'balance should be 49 at current block')
+                    assert.equal(currentBalance.toNumber(), bigExp(30, decimals).toNumber(), 'balance should be 30 at current block')
                 })
 
                 it('uses current balance as vote weight when balance decreases after vote start', async () => {
