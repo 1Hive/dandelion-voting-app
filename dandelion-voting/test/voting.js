@@ -313,7 +313,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     const state = await voting.getVote(voteId)
 
                     const currentBalance = await token.balanceOf(holder29)
-                    assert.equal(state[7].toString(), bigExp(28, decimals).toString(), 'snapshot balance should have been added')
+                    assert.equal(state[7].toString(), bigExp(28, decimals).toString(), 'current balance should have been added')
                     assert.equal(currentBalance.toNumber(), bigExp(28, decimals).toNumber(), 'balance should be 28 at current block')
                 })
 
