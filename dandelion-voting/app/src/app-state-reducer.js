@@ -4,6 +4,8 @@ import { hasLoadedVoteSettings } from './vote-settings'
 function appStateReducer(state) {
   const ready = hasLoadedVoteSettings(state)
 
+  console.log('READY ', ready)
+
   if (!ready) {
     return { ...state, ready }
   }

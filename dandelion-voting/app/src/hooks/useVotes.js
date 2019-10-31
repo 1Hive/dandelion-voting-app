@@ -112,17 +112,13 @@ export default function useVotes() {
   }, [api, votes, blockNumber])
 
   const setTimeStamps = async (vote, api) => {
-    if (blockNumber >= vote.data.startBlock) {
-      const startTimestamp = await loadBlockTimestamp(vote.data.startBlock, api)
-      setVotesStartTimestamps(
-        votesStartTimestamps.set(vote.voteId, startTimestamp)
-      )
-    }
+    const startTimestamp = await loadBlockTimestamp(vote.data.startBlock, api)
+    setVotesStartTimestamps(
+      votesStartTimestamps.set(vote.voteId, startTimestamp)
+    )
 
-    if (blockNumber >= vote.data.endBlock) {
-      const endTimestamp = await loadBlockTimestamp(vote.data.endBlock, api)
-      setVotesEndTimestamps(votesEndTimestamps.set(vote.voteId, endTimestamp))
-    }
+    const endTimestamp = await loadBlockTimestamp(vote.data.endBlock, api)
+    setVotesEndTimestamps(votesEndTimestamps.set(vote.voteId, endTimestamp))
   }
 
   const openedStates = votes.map(v => isVoteOpen(v, blockNumber))
