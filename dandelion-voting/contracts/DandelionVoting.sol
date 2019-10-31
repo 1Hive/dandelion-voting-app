@@ -234,7 +234,7 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     *      with 'authP(SOME_ACL_ROLE, arr(sender))', where sender is typically set to 'msg.sender'.
     * @param _who The address to check if can perform (ignored if `_how` contains an address)
     * @param _how Array passed by Kernel when using 'authP()'. First item should be the address to check can perform.
-    * return True if the sender has not voted on the most recent open vote or closed unexecuted vote, false if they have.
+    * return False if the sender has voted on the most recent open vote or closed unexecuted vote, true if they haven't.
     */
     function canPerform(address _who, address, bytes32, uint256[] _how) external view returns (bool) {
         if (votesLength == 0) {
@@ -244,11 +244,11 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
         Vote storage latestVote = votes[votesLength];
         address sender = _how.length > 0 ? address(_how[0]) : _who;
 
-        bool senderNotVotedOnLatestVote = lastYeaVoteId[sender] != votesLength;
+        bool senderNotVotedYeaOnLatestVote = lastYeaVoteId[sender] != votesLength;
         bool latestVoteFinished = getBlockNumber64() > latestVote.startBlock.add(voteDurationBlocks);
         bool latestVoteFailed = !_votePassed(latestVote);
 
-        return senderNotVotedOnLatestVote || (latestVoteFinished && (latestVoteFailed || latestVote.executed));
+        return senderNotVotedYeaOnLatestVote || (latestVoteFinished && latestVoteFailed) || latestVote.executed;
     }
 
     // Getter fns

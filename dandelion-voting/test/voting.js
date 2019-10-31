@@ -508,9 +508,9 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
                         await voting.vote(voteId, true, { from: holder29 })
 
-                        const actualLastYeaBlock = await voting.lastYeaVoteId(holder29)
-                        assert.equal(actualLastYeaBlock.toString(), secondVoteId.toString())
-                        assert.notEqual(actualLastYeaBlock.toString(), voteId.toString())
+                        const actualLastYeaVoteId = await voting.lastYeaVoteId(holder29)
+                        assert.equal(actualLastYeaVoteId.toString(), secondVoteId.toString())
+                        assert.notEqual(actualLastYeaVoteId.toString(), voteId.toString())
                     })
                 })
 
