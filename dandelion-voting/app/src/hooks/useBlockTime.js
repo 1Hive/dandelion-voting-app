@@ -6,7 +6,7 @@ const NETWORK_TIMES = new Map([
   ['rinkeby', 14.5],
   ['ropsten', 11.5],
   ['goerli', 15],
-  ['private', 8]
+  ['private', 2]
 ])
 export default function useBlockTime() {
   const network = useNetwork()

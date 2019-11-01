@@ -5,7 +5,7 @@ import {
   useInstalledApps,
   useApi
 } from '@aragon/api-react'
-import { isVoteOpen, isVotePending } from '../vote-utils'
+import { isVoteOpen, isVotePending, isVoteDelayed } from '../vote-utils'
 import { VOTE_ABSENT } from '../vote-types'
 import { EMPTY_ADDRESS, loadBlockTimestamp } from '../web3-utils'
 import useBlockNumber from './useBlockNumber'
@@ -118,7 +118,6 @@ export default function useVotes() {
         votesStartTimestamps.set(vote.voteId, startTimestamp)
       )
     }
-
     if (blockNumber >= vote.data.endBlock) {
       const endTimestamp = await loadBlockTimestamp(vote.data.endBlock, api)
       setVotesEndTimestamps(votesEndTimestamps.set(vote.voteId, endTimestamp))
@@ -127,8 +126,10 @@ export default function useVotes() {
 
   const openedStates = votes.map(v => isVoteOpen(v, blockNumber))
   const pendingToStartStates = votes.map(v => isVotePending(v, blockNumber))
+  const delayedStates = votes.map(v => isVoteDelayed(v, blockNumber))
   const openedStatesKey = openedStates.join('')
   const pendingStatesKey = pendingToStartStates.join('')
+  const delayedStatesKey = delayedStates.join('')
   const votesStartTimeStampsKey = JSON.stringify([...votesStartTimestamps])
   const votesEndTimeStampsKey = JSON.stringify([...votesEndTimestamps])
 
@@ -140,11 +141,17 @@ export default function useVotes() {
           ...vote.data,
           open: openedStates[i],
           pending: pendingToStartStates[i],
+          delayed: delayedStates[i],
           startDate: votesStartTimestamps.get(vote.voteId) || null,
           endDate: votesEndTimestamps.get(vote.voteId) || null,
           pendingStartDate:
             new Date(
               nowDate + (vote.data.startBlock - blockNumber) * blockTime * 1000
+            ) || null,
+          allowedToExcuteDate:
+            new Date(
+              nowDate +
+                (vote.data.executionBlock - blockNumber) * blockTime * 1000
             ) || null
         }
       }))
@@ -153,7 +160,8 @@ export default function useVotes() {
       votesStartTimeStampsKey,
       votesEndTimeStampsKey,
       openedStatesKey,
-      pendingStatesKey
+      pendingStatesKey,
+      delayedStatesKey
     ]), // eslint-disable-line react-hooks/exhaustive-deps
     executionTargets
   ]

@@ -6,6 +6,7 @@ pragma solidity 0.4.24;
 
 import "@aragon/os/contracts/apps/AragonApp.sol";
 import "@aragon/os/contracts/common/IForwarder.sol";
+import "@aragon/os/contracts/acl/IACLOracle.sol";
 
 import "@aragon/os/contracts/lib/math/SafeMath.sol";
 import "@aragon/os/contracts/lib/math/SafeMath64.sol";
@@ -13,7 +14,7 @@ import "@aragon/os/contracts/lib/math/SafeMath64.sol";
 import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 
 
-contract DandelionVoting is IForwarder, AragonApp {
+contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     using SafeMath for uint256;
     using SafeMath64 for uint64;
 
@@ -21,6 +22,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     bytes32 public constant MODIFY_SUPPORT_ROLE = keccak256("MODIFY_SUPPORT_ROLE");
     bytes32 public constant MODIFY_QUORUM_ROLE = keccak256("MODIFY_QUORUM_ROLE");
     bytes32 public constant MODIFY_BUFFER_BLOCKS_ROLE = keccak256("MODIFY_BUFFER_BLOCKS_ROLE");
+    bytes32 public constant MODIFY_EXECUTION_DELAY_ROLE = keccak256("MODIFY_EXECUTION_DELAY_ROLE");
 
     uint64 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10^16; 100% = 10^18
 
@@ -40,6 +42,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     struct Vote {
         bool executed;
         uint64 startBlock;
+        uint64 executionBlock;
         uint64 snapshotBlock;
         uint64 supportRequiredPct;
         uint64 minAcceptQuorumPct;
@@ -54,11 +57,12 @@ contract DandelionVoting is IForwarder, AragonApp {
     uint64 public minAcceptQuorumPct;
     uint64 public voteDurationBlocks;
     uint64 public voteBufferBlocks;
+    uint64 public executionDelayBlocks;
 
     // We are mimicing an array, we use a mapping instead to make app upgrade more graceful
     mapping (uint256 => Vote) internal votes;
     uint256 public votesLength;
-    mapping (address => uint64) public lastYeaVoteBlock;
+    mapping (address => uint256) public lastYeaVoteId;
 
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
@@ -66,9 +70,10 @@ contract DandelionVoting is IForwarder, AragonApp {
     event ChangeSupportRequired(uint64 supportRequiredPct);
     event ChangeMinQuorum(uint64 minAcceptQuorumPct);
     event ChangeVoteBufferBlocks(uint64 voteBufferBlocks);
+    event ChangeExecutionDelayBlocks(uint64 executionDelayBlocks);
 
     modifier voteExists(uint256 _voteId) {
-        require(_voteId < votesLength, ERROR_NO_VOTE);
+        require(_voteId <= votesLength, ERROR_NO_VOTE);
         _;
     }
 
@@ -79,8 +84,16 @@ contract DandelionVoting is IForwarder, AragonApp {
     * @param _minAcceptQuorumPct Percentage of yeas in total possible votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
     * @param _voteDurationBlocks Blocks that a vote will be open for token holders to vote
     * @param _voteBufferBlocks Minimum number of blocks between the start block of each vote
+    * @param _executionDelayBlocks Minimum number of blocks between the end of a vote and when it can be executed
     */
-    function initialize(MiniMeToken _token, uint64 _supportRequiredPct, uint64 _minAcceptQuorumPct, uint64 _voteDurationBlocks, uint64 _voteBufferBlocks)
+    function initialize(
+        MiniMeToken _token,
+        uint64 _supportRequiredPct,
+        uint64 _minAcceptQuorumPct,
+        uint64 _voteDurationBlocks,
+        uint64 _voteBufferBlocks,
+        uint64 _executionDelayBlocks
+    )
         external
         onlyInit
     {
@@ -94,6 +107,7 @@ contract DandelionVoting is IForwarder, AragonApp {
         minAcceptQuorumPct = _minAcceptQuorumPct;
         voteDurationBlocks = _voteDurationBlocks;
         voteBufferBlocks = _voteBufferBlocks;
+        executionDelayBlocks = _executionDelayBlocks;
     }
 
     /**
@@ -132,6 +146,15 @@ contract DandelionVoting is IForwarder, AragonApp {
     function changeVoteBufferBlocks(uint64 _voteBufferBlocks) external auth(MODIFY_BUFFER_BLOCKS_ROLE) {
         voteBufferBlocks = _voteBufferBlocks;
         emit ChangeVoteBufferBlocks(_voteBufferBlocks);
+    }
+
+    /**
+    * @notice Change execution delay to `_executionDelayBlocks` blocks
+    * @param _executionDelayBlocks New vote execution delay defined in blocks
+    */
+    function changeExecutionDelayBlocks(uint64 _executionDelayBlocks) external auth(MODIFY_EXECUTION_DELAY_ROLE) {
+        executionDelayBlocks = _executionDelayBlocks;
+        emit ChangeExecutionDelayBlocks(_executionDelayBlocks);
     }
 
     /**
@@ -174,7 +197,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     // Forwarding fns
 
     /**
-    * @notice Tells whether the Voting app is a forwarder or not
+    * @notice Returns whether the Voting app is a forwarder or not
     * @dev IForwarder interface conformance
     * @return Always true
     */
@@ -193,7 +216,7 @@ contract DandelionVoting is IForwarder, AragonApp {
     }
 
     /**
-    * @notice Tells whether `_sender` can forward actions or not
+    * @notice Returns whether `_sender` can forward actions or not
     * @dev IForwarder interface conformance
     * @param _sender Address of the account intending to forward an action
     * @return True if the given address can create votes, false otherwise
@@ -201,6 +224,31 @@ contract DandelionVoting is IForwarder, AragonApp {
     function canForward(address _sender, bytes) public view returns (bool) {
         // Note that `canPerform()` implicitly does an initialization check itself
         return canPerform(_sender, CREATE_VOTES_ROLE, arr());
+    }
+
+    // ACL Oracle fns
+
+    /**
+    * @notice Returns whether the sender has voted on the most recent open vote or closed unexecuted vote.
+    * @dev IACLOracle interface conformance. The ACLOracle permissioned function should specify the sender
+    *      with 'authP(SOME_ACL_ROLE, arr(sender))', where sender is typically set to 'msg.sender'.
+    * @param _who The address to check if can perform (ignored if `_how` contains an address)
+    * @param _how Array passed by Kernel when using 'authP()'. First item should be the address to check can perform.
+    * return False if the sender has voted on the most recent open vote or closed unexecuted vote, true if they haven't.
+    */
+    function canPerform(address _who, address, bytes32, uint256[] _how) external view returns (bool) {
+        if (votesLength == 0) {
+            return true;
+        }
+
+        Vote storage latestVote = votes[votesLength];
+        address sender = _how.length > 0 ? address(_how[0]) : _who;
+
+        bool senderNotVotedYeaOnLatestVote = lastYeaVoteId[sender] != votesLength;
+        bool latestVoteFinished = getBlockNumber64() > latestVote.startBlock.add(voteDurationBlocks);
+        bool latestVoteFailed = !_votePassed(latestVote);
+
+        return senderNotVotedYeaOnLatestVote || (latestVoteFinished && latestVoteFailed) || latestVote.executed;
     }
 
     // Getter fns
@@ -247,6 +295,7 @@ contract DandelionVoting is IForwarder, AragonApp {
             bool open,
             bool executed,
             uint64 startBlock,
+            uint64 executionBlock,
             uint64 snapshotBlock,
             uint64 supportRequired,
             uint64 minAcceptQuorum,
@@ -261,6 +310,7 @@ contract DandelionVoting is IForwarder, AragonApp {
         open = _isVoteOpen(vote_);
         executed = vote_.executed;
         startBlock = vote_.startBlock;
+        executionBlock = vote_.executionBlock;
         snapshotBlock = vote_.snapshotBlock;
         votingPower = token.totalSupplyAt(vote_.snapshotBlock);
         supportRequired = vote_.supportRequiredPct;
@@ -286,14 +336,17 @@ contract DandelionVoting is IForwarder, AragonApp {
     * @return voteId id for newly created vote
     */
     function _newVote(bytes _executionScript, string _metadata, bool _castVote) internal returns (uint256 voteId) {
-        voteId = votesLength++;
+        voteId = ++votesLength; // Increment votesLength before assigning to votedId. The first voteId is 1.
 
-        uint64 previousVoteStartBlock = voteId == 0 ? 1 : votes[voteId - 1].startBlock;
-        uint64 earliestStartBlock = previousVoteStartBlock == 1 ? 1 : previousVoteStartBlock.add(voteBufferBlocks);
+        uint64 previousVoteStartBlock = votes[voteId - 1].startBlock;
+        uint64 earliestStartBlock = previousVoteStartBlock == 0 ? 0 : previousVoteStartBlock.add(voteBufferBlocks);
         uint64 startBlock = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
+
+        uint64 executionBlock = startBlock.add(voteDurationBlocks).add(executionDelayBlocks);
 
         Vote storage vote_ = votes[voteId];
         vote_.startBlock = startBlock;
+        vote_.executionBlock = executionBlock;
         vote_.snapshotBlock = startBlock - 1; // avoid double voting in this very block
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
@@ -313,11 +366,14 @@ contract DandelionVoting is IForwarder, AragonApp {
         Vote storage vote_ = votes[_voteId];
 
         // This could re-enter, though we can assume the governance token is not malicious
-        uint256 voterStake = token.balanceOfAt(_voter, vote_.snapshotBlock);
+        uint256 balanceAtSnapshot = token.balanceOfAt(_voter, vote_.snapshotBlock);
+        uint256 currentBalance = token.balanceOf(_voter);
+
+        uint256 voterStake = balanceAtSnapshot < currentBalance ? balanceAtSnapshot : currentBalance;
 
         if (_supports) {
             vote_.yea = vote_.yea.add(voterStake);
-            lastYeaVoteBlock[_voter] = lastYeaVoteBlock[_voter] < vote_.startBlock ? vote_.startBlock : lastYeaVoteBlock[_voter];
+            lastYeaVoteId[_voter] = lastYeaVoteId[_voter] < _voteId ? _voteId : lastYeaVoteId[_voter];
         } else {
             vote_.nay = vote_.nay.add(voterStake);
         }
@@ -357,30 +413,37 @@ contract DandelionVoting is IForwarder, AragonApp {
         Vote storage vote_ = votes[_voteId];
         uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
 
-        if (_isVoteOpen(vote_)) {
-            return false;
-        }
-
         if (vote_.executed) {
             return false;
         }
 
-        // Voting is already decided
-        if (_isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.supportRequiredPct)) {
-            return true;
+        if (getBlockNumber64() < vote_.executionBlock) {
+            return false;
         }
 
-        // Has enough support?
+        // Votes must be executed in the order they are created
+        if (_voteId > 0) {
+            Vote storage previousVote_ = votes[_voteId.sub(1)];
+            if (_votePassed(previousVote_) && !previousVote_.executed) {
+                return false;
+            }
+        }
+
+        return _votePassed(vote_);
+    }
+
+    /**
+    * @dev Internal function to check if a vote has passed. It assumes the vote period has passed.
+    * @return True if the given vote has passed, false otherwise.
+    */
+    function _votePassed(Vote storage vote_) internal view returns (bool) {
         uint256 totalVotes = vote_.yea.add(vote_.nay);
-        if (!_isValuePct(vote_.yea, totalVotes, vote_.supportRequiredPct)) {
-            return false;
-        }
-        // Has min quorum?
-        if (!_isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.minAcceptQuorumPct)) {
-            return false;
-        }
+        uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
 
-        return true;
+        bool hasSupportRequired = _isValuePct(vote_.yea, totalVotes, vote_.supportRequiredPct);
+        bool hasMinQuorum = _isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.minAcceptQuorumPct);
+
+        return hasSupportRequired && hasMinQuorum;
     }
 
     /**

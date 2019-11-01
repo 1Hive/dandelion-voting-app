@@ -3,7 +3,7 @@
     "default": {
       "network": "rpc",
       "registry": "0x5f6f7e8cc7346a11ca2def8f827b7a0b612c56a1",
-      "appName": "dandelion-voting.open.aragonpm.eth"
+      "appName": "dandelion-voting.aragonpm.eth"
     },
     "staging": {
       "registry": "0x98Df287B6C145399Aaa709692c8D308357bC085D",
@@ -11,8 +11,9 @@
       "network": "rinkeby"
     },
     "rinkeby": {
-      "registry": "0x98Df287B6C145399Aaa709692c8D308357bC085D",
+      "registry": "0x98df287b6c145399aaa709692c8d308357bc085d",
       "appName": "dandelion-voting.aragonpm.eth",
+      "wsRPC": "wss://rinkeby.eth.aragon.network/ws",
       "network": "rinkeby"
     },
     "ropsten": {
@@ -45,6 +46,11 @@
     {
       "name": "Modify buffer blocks",
       "id": "MODIFY_BUFFER_BLOCKS_ROLE",
+      "params": []
+    },
+    {
+      "name": "Modify execution delay blocks",
+      "id": "MODIFY_EXECUTION_DELAY_ROLE",
       "params": []
     }
   ],
