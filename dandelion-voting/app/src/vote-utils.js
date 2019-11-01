@@ -22,11 +22,21 @@ export function isVotePending(vote, currentBlockNumber) {
   return currentBlockNumber <= snapshotBlock
 }
 
+export function isVoteDelayed(vote, currentBlockNumber) {
+  const { executionBlock } = vote.data
+
+  return currentBlockNumber <= executionBlock
+}
+
 export function isVoteOpen(vote, currentBlockNumber) {
-  const { executed, endBlock, snapshotBlock } = vote.data
+  const { executed, endBlock, snapshotBlock, startBlock } = vote.data
+  console.log('startBlock ', startBlock)
+  console.log('endBlock ', endBlock)
+  console.log('current', currentBlockNumber)
   // Open if not executed and date is still before end date
   const isBetweeen =
     snapshotBlock < currentBlockNumber && currentBlockNumber < endBlock
+  console.log('vote is between ', isBetweeen)
   return !executed && isBetweeen
 }
 

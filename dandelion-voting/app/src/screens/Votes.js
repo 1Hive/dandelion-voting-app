@@ -48,8 +48,7 @@ const Votes = React.memo(function Votes({
   handleVoteAppFilterChange,
   voteDateRangeFilter,
   handleVoteDateRangeFilterChange,
-  handleClearFilters,
-  lastTimeVotedYes
+  handleClearFilters
 }) {
   const theme = useTheme()
   const { layoutName } = useLayout()
@@ -150,51 +149,19 @@ const Votes = React.memo(function Votes({
           </div>
         </Bar>
       )}
-      <Split
-        primary={
-          <React.Fragment>
-            {!filteredVotes.length ? (
-              <EmptyFilteredVotes onClear={handleClearFilters} />
-            ) : (
-              <VoteGroups
-                openVotes={openVotes}
-                pendingVotes={pendingVotes}
-                closedVotes={closedVotes}
-                onSelectVote={selectVote}
-              />
-            )}
-          </React.Fragment>
-        }
-        secondary={
-          <React.Fragment>
-            <Box
-              css={`
-                margin-top: ${6 * GU}px;
-              `}
-              heading='Last time Yes'
-            >
-              <React.Fragment>
-                <div
-                  css={`
-                    margin-top: ${1 * GU}px;
-                    display: inline-grid;
-                    grid-template-columns: auto auto;
-                    grid-gap: ${1 * GU}px;
-                    align-items: center;
-                    color: ${theme.surfaceContentSecondary};
-                    ${textStyle('body2')};
-                  `}
-                >
-                  <IconTime size='small' />
-                  {lastTimeVotedYes
-                    ? formatDate(lastTimeVotedYes)
-                    : 'No record'}
-                </div>
-              </React.Fragment>
-            </Box>
-          </React.Fragment>
-        }
-      />
+
+      <React.Fragment>
+        {!filteredVotes.length ? (
+          <EmptyFilteredVotes onClear={handleClearFilters} />
+        ) : (
+          <VoteGroups
+            openVotes={openVotes}
+            pendingVotes={pendingVotes}
+            closedVotes={closedVotes}
+            onSelectVote={selectVote}
+          />
+        )}
+      </React.Fragment>
     </React.Fragment>
   )
 })

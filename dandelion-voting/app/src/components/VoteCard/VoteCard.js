@@ -11,11 +11,13 @@ import You from '../You'
 import BlockTimerHelper from '../BlockTimerHelper'
 import { useAppState } from '@aragon/api-react'
 import useBlockTime from '../../hooks/useBlockTime'
+import { isVoteAction } from '../../vote-utils'
 
 const VoteCard = ({ vote, onOpen }) => {
   const { voteDurationBlocks } = useAppState()
   const blockTime = useBlockTime()
   const theme = useTheme()
+
   const {
     connectedAccountVote,
     data,
@@ -30,12 +32,20 @@ const VoteCard = ({ vote, onOpen }) => {
     description,
     startDate,
     pending,
-    pendingStartDate
+    delayed,
+    pendingStartDate,
+    allowedToExcuteDate
   } = data
 
   const endDate = pending
     ? pendingStartDate
+    : delayed
+    ? allowedToExcuteDate
     : new Date(startDate + voteDurationBlocks * blockTime * 1000)
+
+  console.log('vote duration ', voteDurationBlocks * blockTime * 1000)
+  console.log('START DATE ', startDate)
+  console.log('END DATE ', endDate)
 
   const options = useMemo(
     () => [
@@ -130,7 +140,7 @@ const VoteCard = ({ vote, onOpen }) => {
           margin-top: ${2 * GU}px;
         `}
       >
-        {open || pending ? (
+        {open || pending || (delayed && isVoteAction(vote)) ? (
           <div
             css={`
               display: flex;

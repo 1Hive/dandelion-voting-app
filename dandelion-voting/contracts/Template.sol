@@ -121,6 +121,6 @@ contract Template is TemplateBase {
     function initApps(Vault vault, TokenManager tokenManager, DandelionVoting voting, MiniMeToken token) internal {
         vault.initialize();
         tokenManager.initialize(token, true, 0);
-        voting.initialize(token, 50 * PCT, 20 * PCT, 15, 5);
+        voting.initialize(token, 50 * PCT, 20 * PCT, 15, 5, 5);
     }
 }

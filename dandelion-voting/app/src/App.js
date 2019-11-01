@@ -26,8 +26,7 @@ const App = React.memo(function App() {
     newVotePanel,
     selectedVote,
     selectVote,
-    votes,
-    lastTimeVotedYes
+    votes
   } = useAppLogic()
   const { layoutName } = useLayout()
   const compactMode = layoutName === 'small'
@@ -104,7 +103,6 @@ const App = React.memo(function App() {
               voteDateRangeFilter={voteDateRangeFilter}
               handleVoteDateRangeFilterChange={handleVoteDateRangeFilterChange}
               handleClearFilters={handleClearFilters}
-              lastTimeVotedYes={lastTimeVotedYes}
             />
           )}
         </React.Fragment>

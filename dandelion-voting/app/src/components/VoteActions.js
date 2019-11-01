@@ -72,7 +72,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
   if (!open) {
     return (
       <React.Fragment>
-        {canExecute && isVoteAction(vote) && (
+        {canExecute && !delayed && isVoteAction(vote) && (
           <React.Fragment>
             <Button mode='strong' onClick={onExecute} wide>
               Enact this vote

@@ -156,11 +156,8 @@ const initState = tokenAddr => async cachedState => {
 
 async function updateConnectedAccount(state, { account }) {
   connectedAccount = account
-  const lastTimeVotedY = await app.call('lastYeaVoteBlock', account).toPromise()
   return {
     ...state,
-    lastTimeVotedYes:
-      lastTimeVotedY != 0 ? await loadBlockTimestamp(lastTimeVotedY) : null,
     // fetch all the votes casted by the connected account
     connectedAccountVotes: state.votes
       ? await getAccountVotes({
@@ -173,10 +170,8 @@ async function updateConnectedAccount(state, { account }) {
 
 async function castVote(state, { voteId, voter }) {
   const { connectedAccountVotes } = state
-  let lastTimeVotedY
   // If the connected account was the one who made the vote, update their voter status
   if (addressesEqual(connectedAccount, voter)) {
-    lastTimeVotedY = await app.call('lastYeaVoteBlock', voter).toPromise()
     // fetch vote state for the connected account for this voteId
     const { voteType } = await loadVoterState({
       connectedAccount,
@@ -197,9 +192,7 @@ async function castVote(state, { voteId, voter }) {
   return updateState(
     {
       ...state,
-      connectedAccountVotes,
-      lastTimeVotedYes:
-        lastTimeVotedY != 0 ? await loadBlockTimestamp(lastTimeVotedY) : null
+      connectedAccountVotes
     },
     voteId,
     transform
@@ -385,11 +378,13 @@ function marshallVote({
   nay,
   snapshotBlock,
   startBlock,
+  executionBlock,
   supportRequired,
   votingPower,
   yea,
   script
 }) {
+  console.log('executionBlock ', executionBlock)
   return {
     executed,
     minAcceptQuorum,
@@ -400,7 +395,8 @@ function marshallVote({
     yea,
     // Like times, blocks should be safe to represent as real numbers
     snapshotBlock: parseInt(snapshotBlock, 10),
-    startBlock: parseInt(startBlock, 10)
+    startBlock: parseInt(startBlock, 10),
+    executionBlock: parseInt(executionBlock, 10)
   }
 }
 
