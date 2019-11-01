@@ -384,7 +384,6 @@ function marshallVote({
   yea,
   script
 }) {
-  console.log('executionBlock ', executionBlock)
   return {
     executed,
     minAcceptQuorum,

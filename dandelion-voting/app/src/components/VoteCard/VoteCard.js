@@ -43,10 +43,6 @@ const VoteCard = ({ vote, onOpen }) => {
     ? allowedToExcuteDate
     : new Date(startDate + voteDurationBlocks * blockTime * 1000)
 
-  console.log('vote duration ', voteDurationBlocks * blockTime * 1000)
-  console.log('START DATE ', startDate)
-  console.log('END DATE ', endDate)
-
   const options = useMemo(
     () => [
       {

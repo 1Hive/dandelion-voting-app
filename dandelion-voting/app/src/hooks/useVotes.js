@@ -125,7 +125,6 @@ export default function useVotes() {
   }
 
   const openedStates = votes.map(v => isVoteOpen(v, blockNumber))
-  console.log('openedStates ', openedStates)
   const pendingToStartStates = votes.map(v => isVotePending(v, blockNumber))
   const delayedStates = votes.map(v => isVoteDelayed(v, blockNumber))
   const openedStatesKey = openedStates.join('')
