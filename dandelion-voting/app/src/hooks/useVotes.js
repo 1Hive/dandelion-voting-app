@@ -140,8 +140,8 @@ export default function useVotes() {
         data: {
           ...vote.data,
           open: openedStates[i],
-          pending: pendingToStartStates[i],
-          delayed: delayedStates[i],
+          pending: pendingToStartStates[i] || false,
+          delayed: delayedStates[i] || false,
           startDate: votesStartTimestamps.get(vote.voteId) || null,
           endDate: votesEndTimestamps.get(vote.voteId) || null,
           pendingStartDate:
