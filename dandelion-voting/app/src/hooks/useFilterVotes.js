@@ -14,8 +14,8 @@ import { getVoteStatus } from '../vote-utils'
 
 const NULL_FILTER_STATE = -1
 const STATUS_FILTER_OPEN = 1
-const STATUS_FILTER_CLOSED = 2
-const STATUS_FILTER_UPCOMING = 3
+const STATUS_FILTER_CLOSED = 3
+const STATUS_FILTER_UPCOMING = 2
 const TREND_FILTER_WILL_PASS = 1
 const TREND_FILTER_WILL_NOT_PASS = 2
 const OUTCOME_FILTER_PASSED = 1
@@ -30,7 +30,9 @@ function testStatusFilter(filter, voteStatus) {
     (filter === STATUS_FILTER_OPEN && voteStatus === VOTE_STATUS_ONGOING) ||
     (filter === STATUS_FILTER_UPCOMING &&
       voteStatus === VOTE_STATUS_UPCOMING) ||
-    (filter === STATUS_FILTER_CLOSED && voteStatus !== VOTE_STATUS_ONGOING)
+    (filter === STATUS_FILTER_CLOSED &&
+      voteStatus !== VOTE_STATUS_ONGOING &&
+      voteStatus !== VOTE_STATUS_UPCOMING)
   )
 }
 

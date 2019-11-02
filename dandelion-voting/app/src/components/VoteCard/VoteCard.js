@@ -151,7 +151,7 @@ const VoteCard = ({ vote, onOpen }) => {
             {endDate && <BlockTimerHelper vote={vote} blockTime={blockTime} />}
           </div>
         ) : (
-          <VoteStatus vote={vote} />
+          !delayed && <VoteStatus vote={vote} />
         )}
       </div>
     </Card>
