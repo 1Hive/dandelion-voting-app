@@ -24,7 +24,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
   const { tokenSymbol } = useAppState()
 
   const { connectedAccountVote, data } = vote
-  const { snapshotBlock, startDate, open } = data
+  const { snapshotBlock, startDate, open, delayed } = data
   const {
     canUserVote,
     canExecute,

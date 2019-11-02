@@ -12,6 +12,7 @@ import BlockTimerHelper from '../BlockTimerHelper'
 import { useAppState } from '@aragon/api-react'
 import useBlockTime from '../../hooks/useBlockTime'
 import { isVoteAction } from '../../vote-utils'
+import { start } from 'repl'
 
 const VoteCard = ({ vote, onOpen }) => {
   const { voteDurationBlocks } = useAppState()
@@ -41,7 +42,9 @@ const VoteCard = ({ vote, onOpen }) => {
     ? pendingStartDate
     : delayed
     ? allowedToExcuteDate
-    : new Date(startDate + voteDurationBlocks * blockTime * 1000)
+    : startDate
+    ? new Date(startDate + voteDurationBlocks * blockTime * 1000)
+    : null
 
   const options = useMemo(
     () => [
@@ -145,7 +148,7 @@ const VoteCard = ({ vote, onOpen }) => {
           >
             {endDate && <Timer end={endDate} maxUnits={4} />}
 
-            <BlockTimerHelper vote={vote} blockTime={blockTime} />
+            {endDate && <BlockTimerHelper vote={vote} blockTime={blockTime} />}
           </div>
         ) : (
           <VoteStatus vote={vote} />
