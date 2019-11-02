@@ -3,28 +3,28 @@
     "default": {
       "network": "rpc",
       "registry": "0x5f6f7e8cc7346a11ca2def8f827b7a0b612c56a1",
-      "appName": "dandelion-voting.aragonpm.eth"
+      "appName": "dandelion-voting.open.aragonpm.eth"
     },
     "staging": {
-      "registry": "0x98df287b6c145399aaa709692c8d308357bc085d",
+      "registry": "0x98Df287B6C145399Aaa709692c8D308357bC085D",
       "appName": "dandelion-voting-staging.open.aragonpm.eth",
+      "network": "rinkeby"
+    },
+    "rinkeby": {
+      "registry": "0x98df287b6c145399aaa709692c8d308357bc085d",
+      "appName": "dandelion-voting.open.aragonpm.eth",
       "wsRPC": "wss://rinkeby.eth.aragon.network/ws",
       "network": "rinkeby"
     },
-    "mainnet": {
-      "registry": "0x314159265dd8dbb310642f98f50c066173c1259b",
-      "appName": "dandelion-voting.aragonpm.eth",
-      "network": "mainnet"
-    },
     "ropsten": {
       "registry": "0x6afe2cacee211ea9179992f89dc61ff25c61e923",
-      "appName": "dandelion-voting.aragonpm.eth",
+      "appName": "dandelion-voting.open.aragonpm.eth",
       "network": "ropsten"
     },
-    "rinkeby-old": {
-      "registry": "0xfbae32d1cde62858bc45f51efc8cc4fa1415447e",
-      "appName": "dandelion-voting.aragonpm.eth",
-      "network": "rinkeby"
+    "mainnet": {
+      "registry": "0x314159265dd8dbb310642f98f50c066173c1259b",
+      "appName": "dandelion-voting.open.aragonpm.eth",
+      "network": "mainnet"
     }
   },
   "roles": [
