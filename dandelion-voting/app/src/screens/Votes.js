@@ -12,10 +12,10 @@ import {
   IconTime,
   _DateRange as DateRange
 } from '@aragon/ui'
-import { format } from 'date-fns'
 import EmptyFilteredVotes from '../components/EmptyFilteredVotes'
 import VoteCard from '../components/VoteCard/VoteCard'
 import VoteCardGroup from '../components/VoteCard/VoteCardGroup'
+import useBlockNumber from '../hooks/useBlockNumber'
 
 const sortVotes = (a, b) => {
   const dateDiff = b.data.endDate - a.data.endDate
@@ -52,8 +52,8 @@ const Votes = React.memo(function Votes({
 }) {
   const theme = useTheme()
   const { layoutName } = useLayout()
+  const currentBlockNumber = useBlockNumber()
   const { openVotes, pendingVotes, closedVotes } = useVotes(filteredVotes)
-  const formatDate = date => `${format(date, 'do MMM yy, HH:mm')} UTC`
 
   const multipleOfTarget = executionTargets.reduce((map, { name }) => {
     map.set(name, map.has(name))

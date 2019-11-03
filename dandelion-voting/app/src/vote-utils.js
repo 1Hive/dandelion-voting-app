@@ -17,27 +17,18 @@ export function isVoteAction(vote) {
 }
 
 export function isVotePending(vote, currentBlockNumber) {
-  if (currentBlockNumber === null) {
-    return false
-  }
   const { snapshotBlock, endBlock } = vote.data
 
   return currentBlockNumber <= snapshotBlock && currentBlockNumber < endBlock
 }
 
 export function isVoteDelayed(vote, currentBlockNumber) {
-  if (currentBlockNumber === null) {
-    return false
-  }
   const { executionBlock, endBlock } = vote.data
 
   return currentBlockNumber > endBlock && currentBlockNumber <= executionBlock
 }
 
 export function isVoteOpen(vote, currentBlockNumber) {
-  if (currentBlockNumber === null) {
-    return false
-  }
   const { executed, endBlock, snapshotBlock, startBlock } = vote.data
   // Open if not executed and date is still before end date
   const isBetweeen =

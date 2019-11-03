@@ -135,33 +135,39 @@ export default function useVotes() {
 
   return [
     useMemo(() => {
-      return votes.map((vote, i) => ({
-        ...vote,
-        data: {
-          ...vote.data,
-          open: openedStates[i],
-          pending: pendingToStartStates[i] || false,
-          delayed: delayedStates[i] || false,
-          startDate: votesStartTimestamps.get(vote.voteId) || null,
-          endDate: votesEndTimestamps.get(vote.voteId) || null,
-          pendingStartDate:
-            new Date(
-              nowDate + (vote.data.startBlock - blockNumber) * blockTime * 1000
-            ) || null,
-          allowedToExcuteDate:
-            new Date(
-              nowDate +
-                (vote.data.executionBlock - blockNumber) * blockTime * 1000
-            ) || null
-        }
-      }))
+      if (blockNumber) {
+        return votes.map((vote, i) => ({
+          ...vote,
+          data: {
+            ...vote.data,
+            open: openedStates[i],
+            pending: pendingToStartStates[i] || false,
+            delayed: delayedStates[i] || false,
+            startDate: votesStartTimestamps.get(vote.voteId) || null,
+            endDate: votesEndTimestamps.get(vote.voteId) || null,
+            pendingStartDate:
+              new Date(
+                nowDate +
+                  (vote.data.startBlock - blockNumber) * blockTime * 1000
+              ) || null,
+            allowedToExcuteDate:
+              new Date(
+                nowDate +
+                  (vote.data.executionBlock - blockNumber) * blockTime * 1000
+              ) || null
+          }
+        }))
+      } else {
+        return []
+      }
     }, [
       votes,
       votesStartTimeStampsKey,
       votesEndTimeStampsKey,
       openedStatesKey,
       pendingStatesKey,
-      delayedStatesKey
+      delayedStatesKey,
+      blockNumber
     ]), // eslint-disable-line react-hooks/exhaustive-deps
     executionTargets
   ]
