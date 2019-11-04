@@ -28,7 +28,7 @@ export function useSelectedVote(votes) {
     // setSelectedVoteId() is exported directly: since `selectedVoteId` is
     // set in the `selectedVote` dependencies, it means that the useMemo()
     // will be updated every time `selectedVoteId` changes.
-    setSelectedVoteId
+    setSelectedVoteId,
   ]
 }
 
@@ -77,13 +77,14 @@ export function useExecuteAction(onDone = noop) {
 export function useAppLogic() {
   const { isSyncing, ready } = useAppState()
   const [votes, executionTargets] = useVotes()
+  console.log('votes', votes)
   const [selectedVote, selectVote] = useSelectedVote(votes)
   const newVotePanel = usePanelState()
 
   const actions = {
     createVote: useCreateVoteAction(newVotePanel.requestClose),
     vote: useVoteAction(),
-    execute: useExecuteAction()
+    execute: useExecuteAction(),
   }
 
   return {
@@ -93,7 +94,7 @@ export function useAppLogic() {
     selectedVote,
     votes,
     isSyncing: isSyncing || !ready,
-    newVotePanel: useMemo(() => newVotePanel, [newVotePanel])
+    newVotePanel: useMemo(() => newVotePanel, [newVotePanel]),
   }
 }
 

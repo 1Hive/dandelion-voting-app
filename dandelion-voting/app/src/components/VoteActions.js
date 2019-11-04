@@ -9,7 +9,7 @@ import {
   Info,
   RADIUS,
   textStyle,
-  useTheme
+  useTheme,
 } from '@aragon/ui'
 import { useAppState, useConnectedAccount } from '@aragon/api-react'
 import useExtendedVoteData from '../hooks/useExtendedVoteData'
@@ -33,7 +33,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
     canUserVotePromise,
     userBalancePromise,
     userBalanceNowPromise,
-    canExecutePromise
+    canExecutePromise,
   } = useExtendedVoteData(vote)
 
   const hasVoted = [VOTE_YEA, VOTE_NAY].includes(connectedAccountVote)
@@ -46,7 +46,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
         canUserVotePromise,
         canExecutePromise,
         userBalancePromise,
-        userBalanceNowPromise
+        userBalanceNowPromise,
       ])
       if (!cancelled) {
         setReady(true)
@@ -62,7 +62,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
     userBalancePromise,
     canUserVotePromise,
     canExecutePromise,
-    userBalanceNowPromise
+    userBalanceNowPromise,
   ])
 
   if (!ready) {
@@ -74,7 +74,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
       <React.Fragment>
         {canExecute && !delayed && isVoteAction(vote) && (
           <React.Fragment>
-            <Button mode='strong' onClick={onExecute} wide>
+            <Button mode="strong" onClick={onExecute} wide>
               Enact this vote
             </Button>
             <Info>
@@ -149,7 +149,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
     return (
       <div>
         <Buttons disabled />
-        <Info mode='warning'>
+        <Info mode="warning">
           You have already voted and changing vote is not allowed.
         </Info>
       </div>
@@ -159,7 +159,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
   return (
     <div>
       <Buttons disabled />
-      <Info mode='warning'>
+      <Info mode="warning">
         {userBalanceNow > 0
           ? 'Although the currently connected account holds tokens, it'
           : 'The currently connected account'}{' '}
@@ -174,18 +174,18 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
 
 const Buttons = ({ onClickYes = noop, onClickNo = noop, disabled = false }) => (
   <ButtonsContainer>
-    <VotingButton mode='positive' wide disabled={disabled} onClick={onClickYes}>
+    <VotingButton mode="positive" wide disabled={disabled} onClick={onClickYes}>
       <IconCheck
-        size='small'
+        size="small"
         css={`
           margin-right: ${1 * GU}px;
         `}
       />
       Yes
     </VotingButton>
-    <VotingButton mode='negative' wide disabled={disabled} onClick={onClickNo}>
+    <VotingButton mode="negative" wide disabled={disabled} onClick={onClickNo}>
       <IconCross
-        size='small'
+        size="small"
         css={`
           margin-right: ${1 * GU}px;
         `}
@@ -205,7 +205,7 @@ const TokenReference = ({
   startDate,
   tokenSymbol,
   userBalance,
-  userBalanceNow
+  userBalanceNow,
 }) => (
   <Info>
     Voting with{' '}

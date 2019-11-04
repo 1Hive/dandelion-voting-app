@@ -2,12 +2,13 @@ import {
   VOTE_ABSENT,
   VOTE_YEA,
   VOTE_NAY,
-  VOTE_STATUS_ONGOING,
   VOTE_STATUS_UPCOMING,
+  VOTE_STATUS_ONGOING,
+  VOTE_STATUS_DELAYED,
   VOTE_STATUS_REJECTED,
   VOTE_STATUS_ACCEPTED,
   VOTE_STATUS_PENDING_ENACTMENT,
-  VOTE_STATUS_ENACTED
+  VOTE_STATUS_ENACTED,
 } from './vote-types'
 
 const EMPTY_SCRIPT = '0x00000001'
@@ -16,39 +17,56 @@ export function isVoteAction(vote) {
   return vote.data && vote.data.script && vote.data.script !== EMPTY_SCRIPT
 }
 
-export function isVotePending(vote, currentBlockNumber) {
-  const { snapshotBlock, endBlock } = vote.data
+export function getVoteTransition(vote, currentBlockNumber, blockTime) {
+  const { startBlock, endBlock, executionBlock } = vote.data
+  const blockTimeMiliseconds = blockTime * 1000
+  const now = Date.now()
 
-  return currentBlockNumber <= snapshotBlock && currentBlockNumber < endBlock
-}
+  // Upcoming
+  if (currentBlockNumber < startBlock) {
+    const remainingBlocks = startBlock - currentBlockNumber
+    return {
+      upcoming: true,
+      remainingBlocks,
+      transitionAt: new Date(now + remainingBlocks * blockTimeMiliseconds),
+    }
+  }
 
-export function isVoteDelayed(vote, currentBlockNumber) {
-  const { executionBlock, endBlock } = vote.data
+  // Open
+  if (startBlock <= currentBlockNumber && currentBlockNumber < endBlock) {
+    const remainingBlocks = endBlock - currentBlockNumber
+    return {
+      open: true,
+      remainingBlocks,
+      transitionAt: new Date(now + remainingBlocks * blockTimeMiliseconds),
+    }
+  }
 
-  return currentBlockNumber > endBlock && currentBlockNumber <= executionBlock
-}
-
-export function isVoteOpen(vote, currentBlockNumber) {
-  const { executed, endBlock, snapshotBlock, startBlock } = vote.data
-  // Open if not executed and date is still before end date
-  const isBetweeen =
-    snapshotBlock < currentBlockNumber && currentBlockNumber < endBlock
-  return !executed && isBetweeen
+  // Delayed
+  if (endBlock <= currentBlockNumber && currentBlockNumber < executionBlock) {
+    const remainingBlocks = executionBlock - currentBlockNumber
+    return {
+      delayed: true,
+      closed: true,
+      remainingBlocks,
+      transitionAt: new Date(now + remainingBlocks * blockTimeMiliseconds),
+    }
+  }
+  return { closed: true }
 }
 
 export const getQuorumProgress = ({ numData: { yea, votingPower } }) =>
   yea / votingPower
 
 export function getVoteStatus(vote, pctBase) {
-  if (vote.data.open) {
-    return VOTE_STATUS_ONGOING
-  }
-  if (vote.data.pending) {
-    return VOTE_STATUS_UPCOMING
-  }
+  if (vote.data.upcoming) return VOTE_STATUS_UPCOMING
+  if (vote.data.open) return VOTE_STATUS_ONGOING
+
   if (!getVoteSuccess(vote, pctBase)) {
     return VOTE_STATUS_REJECTED
   }
+
+  if (vote.data.delayed) return VOTE_STATUS_DELAYED
 
   // Only if the vote has an action do we consider it possible for enactment
   const hasAction = isVoteAction(vote)

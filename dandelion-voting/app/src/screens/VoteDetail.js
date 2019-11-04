@@ -12,7 +12,7 @@ import {
   TransactionBadge,
   textStyle,
   useLayout,
-  useTheme
+  useTheme,
 } from '@aragon/ui'
 import { useAppState, useConnectedAccount, useNetwork } from '@aragon/api-react'
 import { format } from 'date-fns'
@@ -28,7 +28,7 @@ import { percentageList, round, safeDiv } from '../math-utils'
 import { getQuorumProgress } from '../vote-utils'
 import { VOTE_NAY, VOTE_YEA } from '../vote-types'
 import { addressesEqual } from '../web3-utils'
-import useBlockTime from '../hooks/useBlockTime'
+import { useBlockTimeStamp } from '../hooks/useBlock'
 
 const formatDate = date => `${format(date, 'do MMM yy, HH:mm')} UTC`
 
@@ -38,7 +38,7 @@ const DEFAULT_DESCRIPTION =
 function VoteDetail({ vote, onBack, onVote, onExecute }) {
   const theme = useTheme()
   const { layoutName } = useLayout()
-  const { tokenSymbol, voteDurationBlocks } = useAppState()
+  const { tokenSymbol } = useAppState()
   const connectedAccount = useConnectedAccount()
 
   const {
@@ -46,7 +46,7 @@ function VoteDetail({ vote, onBack, onVote, onExecute }) {
     data,
     executionTargetData,
     numData,
-    voteId
+    voteId,
   } = vote
   const { minAcceptQuorum, supportRequired, yea, nay } = numData
   const { creator, description, metadata, open } = data
@@ -93,7 +93,7 @@ function VoteDetail({ vote, onBack, onVote, onExecute }) {
                 label={executionTargetData.name}
               />
               {youVoted && (
-                <Tag icon={<IconCheck size='small' />} label='Voted' />
+                <Tag icon={<IconCheck size="small" />} label="Voted" />
               )}
             </div>
             <section
@@ -109,7 +109,7 @@ function VoteDetail({ vote, onBack, onVote, onExecute }) {
                   ${textStyle('title2')};
                 `}
               >
-                <span css='font-weight: bold;'>Vote #{voteId}</span>
+                <span css="font-weight: bold;">Vote #{voteId}</span>
               </h1>
               <div
                 css={`
@@ -203,10 +203,10 @@ function VoteDetail({ vote, onBack, onVote, onExecute }) {
         }
         secondary={
           <React.Fragment>
-            <Box heading='Status'>
-              <Status vote={vote} voteDurationBlocks={voteDurationBlocks} />
+            <Box heading="Status">
+              <Status vote={vote} />
             </Box>
-            <Box heading='Relative support %'>
+            <Box heading="Relative support %">
               <div
                 css={`
                   ${textStyle('body2')};
@@ -229,7 +229,7 @@ function VoteDetail({ vote, onBack, onVote, onExecute }) {
                 `}
               />
             </Box>
-            <Box heading='Minimum approval %'>
+            <Box heading="Minimum approval %">
               <div
                 css={`
                   ${textStyle('body2')};
@@ -259,24 +259,20 @@ function VoteDetail({ vote, onBack, onVote, onExecute }) {
   )
 }
 
-function Status({ vote, voteDurationBlocks }) {
+function Status({ vote }) {
   const theme = useTheme()
   const network = useNetwork()
-  const blockTime = useBlockTime()
   const {
-    startDate,
-    endDate,
     executionDate,
     executionTransaction,
     open,
-    pending,
-    pendingStartDate
+    upcoming,
+    transitionAt,
+    endBlock,
   } = vote.data
+  const endBlockTimeStamp = useBlockTimeStamp(endBlock)
 
-  if (open || pending) {
-    const estimatedDate = pending
-      ? pendingStartDate
-      : new Date(startDate + voteDurationBlocks * blockTime * 1000)
+  if (open || upcoming) {
     return (
       <React.Fragment>
         <div
@@ -286,9 +282,9 @@ function Status({ vote, voteDurationBlocks }) {
             margin-bottom: ${1 * GU}px;
           `}
         >
-          {pending ? `Time to start ` : ` Time remaining`}
+          {upcoming ? `Time to start ` : ` Time remaining`}
         </div>
-        {estimatedDate && <Timer end={estimatedDate} maxUnits={4} />}
+        {<Timer end={transitionAt} maxUnits={4} />}
       </React.Fragment>
     )
   }
@@ -307,7 +303,8 @@ function Status({ vote, voteDurationBlocks }) {
           ${textStyle('body2')};
         `}
       >
-        <IconTime size='small' /> {formatDate(executionDate || endDate)}
+        <IconTime size="small" />{' '}
+        {formatDate(executionDate || new Date(endBlockTimeStamp))}
       </div>
       {executionTransaction && (
         <div>

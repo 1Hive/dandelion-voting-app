@@ -13,7 +13,7 @@ function appStateReducer(state) {
     tokenDecimals,
     voteDurationBlocks,
     votes,
-    connectedAccountVotes
+    connectedAccountVotes,
   } = state
 
   const pctBaseNum = parseInt(pctBase, 10)
@@ -29,7 +29,7 @@ function appStateReducer(state) {
 
     numData: {
       pctBase: pctBaseNum,
-      tokenDecimals: tokenDecimalsNum
+      tokenDecimals: tokenDecimalsNum,
     },
 
     connectedAccountVotes: connectedAccountVotes || {},
@@ -43,16 +43,13 @@ function appStateReducer(state) {
             data: {
               ...data,
               executionDate: data.executionDate && new Date(data.executionDate),
-              // endDate: getEstimatedEndDate(data.startDate, voteDurationBlocks),
-              endBlock:
-                parseInt(data.startBlock, 10) +
-                parseInt(voteDurationBlocks, 10),
+              endBlock: data.startBlock + parseInt(voteDurationBlocks, 10),
               minAcceptQuorum: new BN(data.minAcceptQuorum),
               nay: new BN(data.nay),
               // startDate: new Date(data.startDate),
               supportRequired: new BN(data.supportRequired),
               votingPower: new BN(data.votingPower),
-              yea: new BN(data.yea)
+              yea: new BN(data.yea),
             },
             numData: {
               minAcceptQuorum: parseInt(data.minAcceptQuorum, 10) / pctBaseNum,
@@ -60,11 +57,11 @@ function appStateReducer(state) {
               supportRequired: parseInt(data.supportRequired, 10) / pctBaseNum,
               votingPower:
                 parseInt(data.votingPower, 10) / tokenDecimalsBaseNum,
-              yea: parseInt(data.yea, 10) / tokenDecimalsBaseNum
-            }
+              yea: parseInt(data.yea, 10) / tokenDecimalsBaseNum,
+            },
           }
         })
-      : []
+      : [],
   }
 }
 

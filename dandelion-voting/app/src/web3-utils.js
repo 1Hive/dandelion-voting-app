@@ -29,7 +29,7 @@ export function addressesEqual(first, second) {
   return first === second
 }
 
-export const loadBlockTimestamp = async (blockNumber, api) => {
+export const loadBlockTimestamp = async (api, blockNumber) => {
   const { timestamp } = await api.web3Eth('getBlock', blockNumber).toPromise()
   // Adjust for solidity time (s => ms)
   return timestamp * 1000

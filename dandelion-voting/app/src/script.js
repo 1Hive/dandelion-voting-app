@@ -6,7 +6,6 @@ import { voteTypeFromContractEnum } from './vote-utils'
 import { EMPTY_CALLSCRIPT } from './evmscript-utils'
 import tokenDecimalsAbi from './abi/token-decimals.json'
 import tokenSymbolAbi from './abi/token-symbol.json'
-import { toUnicode } from 'punycode'
 
 const tokenAbi = [].concat(tokenDecimalsAbi, tokenSymbolAbi)
 
@@ -78,7 +77,7 @@ async function initialize(tokenAddr) {
   return app.store(
     (state, { blockNumber, event, returnValues, transactionHash }) => {
       const nextState = {
-        ...state
+        ...state,
       }
 
       switch (event) {
@@ -93,7 +92,7 @@ async function initialize(tokenAddr) {
         case 'ExecuteVote':
           return executeVote(nextState, returnValues, {
             blockNumber,
-            transactionHash
+            transactionHash,
           })
         case 'StartVote':
           return startVote(nextState, returnValues)
@@ -144,7 +143,7 @@ const initState = tokenAddr => async cachedState => {
     isSyncing: true,
     tokenDecimals,
     tokenSymbol,
-    ...voteSettings
+    ...voteSettings,
   }
 }
 
@@ -162,9 +161,9 @@ async function updateConnectedAccount(state, { account }) {
     connectedAccountVotes: state.votes
       ? await getAccountVotes({
           connectedAccount: account,
-          votes: state.votes
+          votes: state.votes,
         })
-      : {}
+      : {},
   }
 }
 
@@ -175,7 +174,7 @@ async function castVote(state, { voteId, voter }) {
     // fetch vote state for the connected account for this voteId
     const { voteType } = await loadVoterState({
       connectedAccount,
-      voteId
+      voteId,
     })
     connectedAccountVotes[voteId] = voteType
   }
@@ -185,14 +184,14 @@ async function castVote(state, { voteId, voter }) {
     ...vote,
     data: {
       ...vote.data,
-      ...(await loadVoteData(voteId))
-    }
+      ...(await loadVoteData(voteId)),
+    },
   })
 
   return updateState(
     {
       ...state,
-      connectedAccountVotes
+      connectedAccountVotes,
     },
     voteId,
     transform
@@ -210,8 +209,8 @@ async function executeVote(
       ...data,
       executed: true,
       executionDate: await loadBlockTimestamp(blockNumber),
-      executionTransaction: transactionHash
-    }
+      executionTransaction: transactionHash,
+    },
   })
   return updateState(state, voteId, transform)
 }
@@ -222,8 +221,8 @@ async function startVote(state, { creator, metadata = '', voteId }) {
     data: {
       ...vote.data,
       creator,
-      metadata
-    }
+      metadata,
+    },
   }))
 }
 
@@ -238,7 +237,7 @@ async function updateState(state, voteId, transform) {
 
   return {
     ...state,
-    votes: await updateVotes(votes, voteId, transform)
+    votes: await updateVotes(votes, voteId, transform),
   }
 }
 
@@ -247,13 +246,12 @@ async function updateVotes(votes, voteId, transform) {
 
   if (voteIndex === -1) {
     // If we can't find it, load its data, perform the transformation, and concat
-    const ret = votes.concat(
+    return votes.concat(
       await transform({
         voteId,
-        data: await loadVoteData(voteId)
+        data: await loadVoteData(voteId),
       })
     )
-    return ret
   } else {
     const nextVotes = Array.from(votes)
     nextVotes[voteIndex] = await transform(nextVotes[voteIndex])
@@ -281,7 +279,7 @@ async function loadVoterState({ connectedAccount, voteId }) {
   if (!connectedAccount) {
     return {
       voteId,
-      voteType: VOTE_ABSENT
+      voteType: VOTE_ABSENT,
     }
   }
   // Wrap with retry in case the vote is somehow not present
@@ -382,7 +380,7 @@ function marshallVote({
   supportRequired,
   votingPower,
   yea,
-  script
+  script,
 }) {
   return {
     executed,
@@ -395,7 +393,7 @@ function marshallVote({
     // Like times, blocks should be safe to represent as real numbers
     snapshotBlock: parseInt(snapshotBlock, 10),
     startBlock: parseInt(startBlock, 10),
-    executionBlock: parseInt(executionBlock, 10)
+    executionBlock: parseInt(executionBlock, 10),
   }
 }
 

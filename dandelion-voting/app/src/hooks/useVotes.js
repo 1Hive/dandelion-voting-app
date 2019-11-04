@@ -1,15 +1,9 @@
-import { useMemo, useState, useEffect } from 'react'
-import {
-  useAppState,
-  useCurrentApp,
-  useInstalledApps,
-  useApi
-} from '@aragon/api-react'
-import { isVoteOpen, isVotePending, isVoteDelayed } from '../vote-utils'
+import { useMemo } from 'react'
+import { useAppState, useCurrentApp, useInstalledApps } from '@aragon/api-react'
+import { getVoteTransition } from '../vote-utils'
 import { VOTE_ABSENT } from '../vote-types'
-import { EMPTY_ADDRESS, loadBlockTimestamp } from '../web3-utils'
-import useBlockNumber from './useBlockNumber'
-import useBlockTime from './useBlockTime'
+import { EMPTY_ADDRESS } from '../web3-utils'
+import { useBlockNumber, useBlockTime } from './useBlock'
 
 // Temporary fix to make sure executionTargets always returns an array, until
 // we find out the reason why it can sometimes be missing in the cached data.
@@ -36,13 +30,13 @@ function useDecoratedVotes() {
         targetApp = {
           ...currentApp,
           // Don't attach an identifier for this Voting app
-          identifier: undefined
+          identifier: undefined,
         }
       } else if (executionTargets.length > 1) {
         // If there's multiple targets, make a "multiple" version
         targetApp = {
           appAddress: EMPTY_ADDRESS,
-          name: 'Multiple'
+          name: 'Multiple',
         }
       } else {
         // Otherwise, try to find the target from the installed apps
@@ -53,7 +47,7 @@ function useDecoratedVotes() {
           targetApp = {
             appAddress: targetAddress,
             icon: () => null,
-            name: 'External'
+            name: 'External',
           }
         }
       }
@@ -65,14 +59,14 @@ function useDecoratedVotes() {
           address: appAddress,
           name,
           iconSrc: icon(24),
-          identifier
+          identifier,
         }
       }
 
       return {
         ...vote,
         executionTargetData,
-        connectedAccountVote: connectedAccountVotes[vote.voteId] || VOTE_ABSENT
+        connectedAccountVote: connectedAccountVotes[vote.voteId] || VOTE_ABSENT,
       }
     })
 
@@ -86,7 +80,7 @@ function useDecoratedVotes() {
       .map(({ appAddress, identifier, name }) => ({
         appAddress,
         identifier,
-        name
+        name,
       }))
       .sort((a, b) => a.name.localeCompare(b.name))
 
@@ -97,78 +91,24 @@ function useDecoratedVotes() {
 // Get the votes array ready to be used in the app.
 export default function useVotes() {
   const [votes, executionTargets] = useDecoratedVotes()
+  const currentBlock = useBlockNumber()
   const blockTime = useBlockTime()
-  const [votesStartTimestamps, setVotesStartTimestamps] = useState(new Map())
-  const [votesEndTimestamps, setVotesEndTimestamps] = useState(new Map())
-  const nowDate = Date.now()
-  const blockNumber = useBlockNumber()
-  const api = useApi()
 
-  useEffect(() => {
-    const getTimeStamps = async () => {
-      await Promise.all(votes.map(vote => setTimeStamps(vote, api)))
-    }
-    getTimeStamps()
-  }, [api, votes, blockNumber])
+  const voteStates = votes.map(v =>
+    getVoteTransition(v, currentBlock, blockTime)
+  )
 
-  const setTimeStamps = async (vote, api) => {
-    if (blockNumber >= vote.data.startBlock) {
-      const startTimestamp = await loadBlockTimestamp(vote.data.startBlock, api)
-      setVotesStartTimestamps(
-        votesStartTimestamps.set(vote.voteId, startTimestamp)
-      )
-    }
-    if (blockNumber >= vote.data.endBlock) {
-      const endTimestamp = await loadBlockTimestamp(vote.data.endBlock, api)
-      setVotesEndTimestamps(votesEndTimestamps.set(vote.voteId, endTimestamp))
-    }
-  }
-
-  const openedStates = votes.map(v => isVoteOpen(v, blockNumber))
-  const pendingToStartStates = votes.map(v => isVotePending(v, blockNumber))
-  const delayedStates = votes.map(v => isVoteDelayed(v, blockNumber))
-  const openedStatesKey = openedStates.join('')
-  const pendingStatesKey = pendingToStartStates.join('')
-  const delayedStatesKey = delayedStates.join('')
-  const votesStartTimeStampsKey = JSON.stringify([...votesStartTimestamps])
-  const votesEndTimeStampsKey = JSON.stringify([...votesEndTimestamps])
-
+  const voteStatesKeys = voteStates.map(v => Object.keys(v).join('')).join('')
   return [
     useMemo(() => {
-      if (blockNumber) {
-        return votes.map((vote, i) => ({
-          ...vote,
-          data: {
-            ...vote.data,
-            open: openedStates[i],
-            pending: pendingToStartStates[i] || false,
-            delayed: delayedStates[i] || false,
-            startDate: votesStartTimestamps.get(vote.voteId) || null,
-            endDate: votesEndTimestamps.get(vote.voteId) || null,
-            pendingStartDate:
-              new Date(
-                nowDate +
-                  (vote.data.startBlock - blockNumber) * blockTime * 1000
-              ) || null,
-            allowedToExcuteDate:
-              new Date(
-                nowDate +
-                  (vote.data.executionBlock - blockNumber) * blockTime * 1000
-              ) || null
-          }
-        }))
-      } else {
-        return []
-      }
-    }, [
-      votes,
-      votesStartTimeStampsKey,
-      votesEndTimeStampsKey,
-      openedStatesKey,
-      pendingStatesKey,
-      delayedStatesKey,
-      blockNumber
-    ]), // eslint-disable-line react-hooks/exhaustive-deps
-    executionTargets
+      return votes.map((vote, i) => ({
+        ...vote,
+        data: {
+          ...vote.data,
+          ...voteStates[i],
+        },
+      }))
+    }, [votes, voteStatesKeys]), // eslint-disable-line react-hooks/exhaustive-deps
+    executionTargets,
   ]
 }

@@ -6,7 +6,7 @@ import {
   textStyle,
   unselectable,
   useLayout,
-  useTheme
+  useTheme,
 } from '@aragon/ui'
 
 const VoteCardGroup = ({ title, count, children }) => {
@@ -42,7 +42,7 @@ const VoteCardGroup = ({ title, count, children }) => {
             justify-content: center;
           `}
         >
-          <Tag limitDigits={4} label={count} size='small' />
+          <Tag limitDigits={4} label={count} size="small" />
         </span>
       </h2>
       <CardLayout columnWidthMin={30 * GU} rowHeight={rowHeight}>
