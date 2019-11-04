@@ -68,6 +68,8 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
   if (!ready) {
     return null
   }
+  console.log(!open && !delayed && canExecute)
+  console.log(open, delayed, canExecute)
 
   if (!open) {
     return (

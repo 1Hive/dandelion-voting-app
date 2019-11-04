@@ -34,3 +34,7 @@ export const loadBlockTimestamp = async (api, blockNumber) => {
   // Adjust for solidity time (s => ms)
   return timestamp * 1000
 }
+
+export const loadBlockNumber = async api => {
+  return api.web3Eth('getBlockNumber').toPromise()
+}

@@ -35,6 +35,7 @@ export function getVoteTransition(vote, currentBlockNumber, blockTime) {
   // Open
   if (startBlock <= currentBlockNumber && currentBlockNumber < endBlock) {
     const remainingBlocks = endBlock - currentBlockNumber
+    console.log(remainingBlocks)
     return {
       open: true,
       remainingBlocks,

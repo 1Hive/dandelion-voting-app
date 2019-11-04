@@ -25,10 +25,11 @@ import VoteStatus from '../components/VoteStatus'
 import VoteText from '../components/VoteText'
 import VoteCasted from '../components/VoteCasted'
 import { percentageList, round, safeDiv } from '../math-utils'
-import { getQuorumProgress } from '../vote-utils'
+import { getQuorumProgress, getVoteSuccess } from '../vote-utils'
 import { VOTE_NAY, VOTE_YEA } from '../vote-types'
 import { addressesEqual } from '../web3-utils'
 import { useBlockTimeStamp } from '../hooks/useBlock'
+import { useSettings } from '../vote-settings-manager'
 
 const formatDate = date => `${format(date, 'do MMM yy, HH:mm')} UTC`
 
@@ -262,17 +263,21 @@ function VoteDetail({ vote, onBack, onVote, onExecute }) {
 function Status({ vote }) {
   const theme = useTheme()
   const network = useNetwork()
+  const { pctBase } = useSettings()
   const {
     executionDate,
     executionTransaction,
-    open,
     upcoming,
+    open,
+    delayed,
+    closed,
     transitionAt,
     endBlock,
   } = vote.data
-  const endBlockTimeStamp = useBlockTimeStamp(endBlock)
 
-  if (open || upcoming) {
+  const endBlockTimeStamp = useBlockTimeStamp(endBlock, closed)
+
+  if (!closed || (delayed && getVoteSuccess(vote, pctBase))) {
     return (
       <React.Fragment>
         <div
@@ -282,13 +287,18 @@ function Status({ vote }) {
             margin-bottom: ${1 * GU}px;
           `}
         >
-          {upcoming ? `Time to start ` : ` Time remaining`}
+          {upcoming
+            ? `Time to start `
+            : open
+            ? ` Time remaining`
+            : `Delayed for`}
         </div>
         {<Timer end={transitionAt} maxUnits={4} />}
       </React.Fragment>
     )
   }
 
+  const dateHasLoaded = executionDate || endBlockTimeStamp
   return (
     <React.Fragment>
       <VoteStatus vote={vote} />
@@ -304,7 +314,9 @@ function Status({ vote }) {
         `}
       >
         <IconTime size="small" />{' '}
-        {formatDate(executionDate || new Date(endBlockTimeStamp))}
+        {dateHasLoaded
+          ? formatDate(executionDate || new Date(endBlockTimeStamp))
+          : ''}
       </div>
       {executionTransaction && (
         <div>

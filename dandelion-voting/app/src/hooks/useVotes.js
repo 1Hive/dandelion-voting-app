@@ -92,6 +92,7 @@ function useDecoratedVotes() {
 export default function useVotes() {
   const [votes, executionTargets] = useDecoratedVotes()
   const currentBlock = useBlockNumber()
+  console.log('currentblock', currentBlock)
   const blockTime = useBlockTime()
 
   const voteStates = votes.map(v =>

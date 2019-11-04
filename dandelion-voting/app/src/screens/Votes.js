@@ -14,8 +14,8 @@ import VoteCard from '../components/VoteCard/VoteCard'
 import VoteCardGroup from '../components/VoteCard/VoteCardGroup'
 
 const sortVotes = (a, b) => {
-  const dateDiff = b.data.endDate - a.data.endDate
-  // Order by descending voteId if there's no end date difference
+  const dateDiff = b.data.endBlock - a.data.endBlock
+  // Order by descending voteId if there's no end block difference
   return dateDiff !== 0 ? dateDiff : b.voteId - a.voteId
 }
 
@@ -50,6 +50,7 @@ const Votes = React.memo(function Votes({
   const { layoutName } = useLayout()
   const { openVotes, upcomingVotes, closedVotes } = useVotes(filteredVotes)
 
+  console.log('votes', votes)
   const multipleOfTarget = executionTargets.reduce((map, { name }) => {
     map.set(name, map.has(name))
     return map
