@@ -26,16 +26,19 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
 
     uint64 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10^16; 100% = 10^18
 
-    string private constant ERROR_NO_VOTE = "VOTING_NO_VOTE";
-    string private constant ERROR_INIT_PCTS = "VOTING_INIT_PCTS";
-    string private constant ERROR_CHANGE_SUPPORT_PCTS = "VOTING_CHANGE_SUPPORT_PCTS";
-    string private constant ERROR_CHANGE_QUORUM_PCTS = "VOTING_CHANGE_QUORUM_PCTS";
-    string private constant ERROR_INIT_SUPPORT_TOO_BIG = "VOTING_INIT_SUPPORT_TOO_BIG";
-    string private constant ERROR_CHANGE_SUPPORT_TOO_BIG = "VOTING_CHANGE_SUPP_TOO_BIG";
-    string private constant ERROR_CAN_NOT_VOTE = "VOTING_CAN_NOT_VOTE";
-    string private constant ERROR_CAN_NOT_EXECUTE = "VOTING_CAN_NOT_EXECUTE";
-    string private constant ERROR_CAN_NOT_FORWARD = "VOTING_CAN_NOT_FORWARD";
-    string private constant ERROR_NO_VOTING_POWER = "VOTING_NO_VOTING_POWER";
+    string private constant ERROR_VOTE_ID_ZERO = "DANDELION_VOTING_VOTE_ID_ZERO";
+    string private constant ERROR_NO_VOTE = "DANDELION_VOTING_NO_VOTE";
+    string private constant ERROR_INIT_PCTS = "DANDELION_VOTING_INIT_PCTS";
+    string private constant ERROR_CHANGE_SUPPORT_PCTS = "DANDELION_VOTING_CHANGE_SUPPORT_PCTS";
+    string private constant ERROR_CHANGE_QUORUM_PCTS = "DANDELION_VOTING_CHANGE_QUORUM_PCTS";
+    string private constant ERROR_INIT_SUPPORT_TOO_BIG = "DANDELION_VOTING_INIT_SUPPORT_TOO_BIG";
+    string private constant ERROR_CHANGE_SUPPORT_TOO_BIG = "DANDELION_VOTING_CHANGE_SUPP_TOO_BIG";
+    string private constant ERROR_CAN_NOT_VOTE = "DANDELION_VOTING_CAN_NOT_VOTE";
+    string private constant ERROR_CAN_NOT_EXECUTE = "DANDELION_VOTING_CAN_NOT_EXECUTE";
+    string private constant ERROR_CAN_NOT_FORWARD = "DANDELION_VOTING_CAN_NOT_FORWARD";
+    string private constant ERROR_ORACLE_SENDER_MISSING = "DANDELION_VOTING_ORACLE_SENDER_MISSING";
+    string private constant ERROR_ORACLE_SENDER_TOO_BIG = "DANDELION_VOTING_ORACLE_SENDER_TOO_BIG";
+    string private constant ERROR_ORACLE_SENDER_ZERO = "DANDELION_VOTING_ORACLE_SENDER_ZERO";
 
     enum VoterState { Absent, Yea, Nay }
 
@@ -73,6 +76,7 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     event ChangeExecutionDelayBlocks(uint64 executionDelayBlocks);
 
     modifier voteExists(uint256 _voteId) {
+        require(_voteId != 0, ERROR_VOTE_ID_ZERO);
         require(_voteId <= votesLength, ERROR_NO_VOTE);
         _;
     }
@@ -190,8 +194,17 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     *      created via `newVote(),` which requires initialization
     * @param _voteId Id for vote
     */
-    function executeVote(uint256 _voteId) external voteExists(_voteId) {
-        _executeVote(_voteId);
+    function executeVote(uint256 _voteId) external {
+        require(_canExecute(_voteId), ERROR_CAN_NOT_EXECUTE);
+
+        Vote storage vote_ = votes[_voteId];
+
+        vote_.executed = true;
+
+        bytes memory input = new bytes(0); // TODO: Consider input for voting scripts
+        runScript(vote_.executionScript, input, new address[](0));
+
+        emit ExecuteVote(_voteId);
     }
 
     // Forwarding fns
@@ -241,14 +254,18 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
             return true;
         }
 
-        Vote storage latestVote = votes[votesLength];
-        address sender = _how.length > 0 ? address(_how[0]) : _who;
+        require(_how.length > 0, ERROR_ORACLE_SENDER_MISSING);
+        require(_how[0] < 2**160, ERROR_ORACLE_SENDER_TOO_BIG);
+        require(_how[0] != 0, ERROR_ORACLE_SENDER_ZERO);
+        address sender = address(_how[0]);
 
-        bool senderNotVotedYeaOnLatestVote = lastYeaVoteId[sender] != votesLength;
-        bool latestVoteFinished = getBlockNumber64() > latestVote.startBlock.add(voteDurationBlocks);
-        bool latestVoteFailed = !_votePassed(latestVote);
+        uint256 senderLastYeaVoteId = lastYeaVoteId[sender];
+        Vote storage senderLatestYeaVote = votes[senderLastYeaVoteId];
+        bool senderLatestYeaVoteFinished = getBlockNumber64() > senderLatestYeaVote.startBlock.add(voteDurationBlocks);
+        bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote);
+        bool senderLatestYeaVoteExecutionPeriodPassed = getBlockNumber64() > senderLatestYeaVote.executionBlock.add(voteBufferBlocks.div(2));
 
-        return senderNotVotedYeaOnLatestVote || (latestVoteFinished && latestVoteFailed) || latestVote.executed;
+        return senderLatestYeaVoteFinished && senderLatestYeaVoteFailed || senderLatestYeaVote.executed || senderLatestYeaVoteExecutionPeriodPassed;
     }
 
     // Getter fns
@@ -259,7 +276,7 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     *      created via `newVote(),` which requires initialization
     * @return True if the given vote can be executed, false otherwise
     */
-    function canExecute(uint256 _voteId) public view voteExists(_voteId) returns (bool) {
+    function canExecute(uint256 _voteId) public view returns (bool) {
         return _canExecute(_voteId);
     }
 
@@ -371,7 +388,9 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
 
         if (_supports) {
             vote_.yea = vote_.yea.add(voterStake);
-            lastYeaVoteId[_voter] = lastYeaVoteId[_voter] < _voteId ? _voteId : lastYeaVoteId[_voter];
+            if (lastYeaVoteId[_voter] < _voteId) {
+                lastYeaVoteId[_voter] = _voteId;
+            }
         } else {
             vote_.nay = vote_.nay.add(voterStake);
         }
@@ -382,47 +401,29 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     }
 
     /**
-    * @dev Internal function to execute a vote. It assumes the queried vote exists.
-    */
-    function _executeVote(uint256 _voteId) internal {
-        require(_canExecute(_voteId), ERROR_CAN_NOT_EXECUTE);
-        _unsafeExecuteVote(_voteId);
-    }
-
-    /**
-    * @dev Unsafe version of _executeVote that assumes you have already checked if the vote can be executed and exists
-    */
-    function _unsafeExecuteVote(uint256 _voteId) internal {
-        Vote storage vote_ = votes[_voteId];
-
-        vote_.executed = true;
-
-        bytes memory input = new bytes(0); // TODO: Consider input for voting scripts
-        runScript(vote_.executionScript, input, new address[](0));
-
-        emit ExecuteVote(_voteId);
-    }
-
-    /**
     * @dev Internal function to check if a vote can be executed. It assumes the queried vote exists.
     * @return True if the given vote can be executed, false otherwise
     */
-    function _canExecute(uint256 _voteId) internal view returns (bool) {
+    function _canExecute(uint256 _voteId) internal view voteExists(_voteId) returns (bool) {
         Vote storage vote_ = votes[_voteId];
-        uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
 
         if (vote_.executed) {
             return false;
         }
 
+        // This will always be later than the end of the previous vote
         if (getBlockNumber64() < vote_.executionBlock) {
             return false;
         }
 
         // Votes must be executed in the order they are created
-        if (_voteId > 0) {
-            Vote storage previousVote_ = votes[_voteId.sub(1)];
-            if (_votePassed(previousVote_) && !previousVote_.executed) {
+        if (_voteId > 1) {
+            Vote storage previousVote_ = votes[_voteId - 1];
+
+            // TODO: Put somewhere common.
+            bool beforePreviousVoteExecutionPeriodPassed = getBlockNumber64() < previousVote_.executionBlock.add(voteBufferBlocks.div(2));
+
+            if (beforePreviousVoteExecutionPeriodPassed && _votePassed(previousVote_) && !previousVote_.executed) {
                 return false;
             }
         }
@@ -451,8 +452,12 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     function _canVote(uint256 _voteId, address _voter) internal view returns (bool) {
         Vote storage vote_ = votes[_voteId];
         uint256 balanceAtSnapshot = token.balanceOfAt(_voter, vote_.snapshotBlock);
+        uint256 currentBalance = token.balanceOf(_voter);
 
-        return _isVoteOpen(vote_) && balanceAtSnapshot > 0 && _hasNotVoted(vote_, _voter);
+        uint256 voterStake = balanceAtSnapshot < currentBalance ? balanceAtSnapshot : currentBalance;
+        bool hasNotVoted = vote_.voters[_voter] == VoterState.Absent;
+
+        return _isVoteOpen(vote_) && voterStake > 0 && hasNotVoted;
     }
 
     /**
@@ -462,14 +467,6 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
         uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
         return votingPowerAtSnapshot > 0 && getBlockNumber64() >= vote_.startBlock && getBlockNumber64() < vote_.startBlock.add(voteDurationBlocks);
-    }
-
-    /**
-    * @dev Internal function to check if a voter has already voted
-    * @return True if the given voter has not voted, false if they have voted
-    */
-    function _hasNotVoted(Vote storage vote_, address _voter) internal view returns (bool) {
-        return vote_.voters[_voter] == VoterState.Absent;
     }
 
     /**
