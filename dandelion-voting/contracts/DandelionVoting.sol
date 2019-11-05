@@ -245,11 +245,10 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     * @notice Returns whether the sender has voted on the most recent open vote or closed unexecuted vote.
     * @dev IACLOracle interface conformance. The ACLOracle permissioned function should specify the sender
     *      with 'authP(SOME_ACL_ROLE, arr(sender))', where sender is typically set to 'msg.sender'.
-    * @param _who The address to check if can perform (ignored if `_how` contains an address)
     * @param _how Array passed by Kernel when using 'authP()'. First item should be the address to check can perform.
     * return False if the sender has voted on the most recent open vote or closed unexecuted vote, true if they haven't.
     */
-    function canPerform(address _who, address, bytes32, uint256[] _how) external view returns (bool) {
+    function canPerform(address, address, bytes32, uint256[] _how) external view returns (bool) {
         if (votesLength == 0) {
             return true;
         }
@@ -263,7 +262,7 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
         Vote storage senderLatestYeaVote = votes[senderLastYeaVoteId];
         bool senderLatestYeaVoteFinished = getBlockNumber64() > senderLatestYeaVote.startBlock.add(voteDurationBlocks);
         bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote);
-        bool senderLatestYeaVoteExecutionPeriodPassed = getBlockNumber64() > senderLatestYeaVote.executionBlock.add(voteBufferBlocks.div(2));
+        bool senderLatestYeaVoteExecutionPeriodPassed = _hasVoteExecutionPeriodPassed(senderLatestYeaVote);
 
         return senderLatestYeaVoteFinished && senderLatestYeaVoteFailed || senderLatestYeaVote.executed || senderLatestYeaVoteExecutionPeriodPassed;
     }
@@ -380,11 +379,7 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     function _vote(uint256 _voteId, bool _supports, address _voter) internal {
         Vote storage vote_ = votes[_voteId];
 
-        // This could re-enter, though we can assume the governance token is not malicious
-        uint256 balanceAtSnapshot = token.balanceOfAt(_voter, vote_.snapshotBlock);
-        uint256 currentBalance = token.balanceOf(_voter);
-
-        uint256 voterStake = balanceAtSnapshot < currentBalance ? balanceAtSnapshot : currentBalance;
+        uint256 voterStake = _voterStake(vote_, _voter);
 
         if (_supports) {
             vote_.yea = vote_.yea.add(voterStake);
@@ -419,16 +414,21 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
         // Votes must be executed in the order they are created
         if (_voteId > 1) {
             Vote storage previousVote_ = votes[_voteId - 1];
-
-            // TODO: Put somewhere common.
-            bool beforePreviousVoteExecutionPeriodPassed = getBlockNumber64() < previousVote_.executionBlock.add(voteBufferBlocks.div(2));
-
+            bool beforePreviousVoteExecutionPeriodPassed = !_hasVoteExecutionPeriodPassed(previousVote_);
             if (beforePreviousVoteExecutionPeriodPassed && _votePassed(previousVote_) && !previousVote_.executed) {
                 return false;
             }
         }
 
         return _votePassed(vote_);
+    }
+
+    /**
+    * @dev Internal function to check if vote execution period has passed, necessary if a vote script cannot be executed.
+    * @return True if the given votes execution period has passed, false otherwise
+    */
+    function _hasVoteExecutionPeriodPassed(Vote storage vote_) internal view returns (bool) {
+        return getBlockNumber64() > vote_.executionBlock.add(voteBufferBlocks.div(2));
     }
 
     /**
@@ -451,13 +451,22 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     */
     function _canVote(uint256 _voteId, address _voter) internal view returns (bool) {
         Vote storage vote_ = votes[_voteId];
-        uint256 balanceAtSnapshot = token.balanceOfAt(_voter, vote_.snapshotBlock);
-        uint256 currentBalance = token.balanceOf(_voter);
 
-        uint256 voterStake = balanceAtSnapshot < currentBalance ? balanceAtSnapshot : currentBalance;
+        uint256 voterStake = _voterStake(vote_, _voter);
         bool hasNotVoted = vote_.voters[_voter] == VoterState.Absent;
 
         return _isVoteOpen(vote_) && voterStake > 0 && hasNotVoted;
+    }
+
+    /**
+    * @dev Internal function to determine a voters stake which is the minimum of snapshot balance and current balance.
+    * @return Voters current stake.
+    */
+    function _voterStake(Vote storage vote_, address _voter) internal view returns (uint256) {
+        uint256 balanceAtSnapshot = token.balanceOfAt(_voter, vote_.snapshotBlock);
+        uint256 currentBalance = token.balanceOf(_voter);
+
+        return balanceAtSnapshot < currentBalance ? balanceAtSnapshot : currentBalance;
     }
 
     /**

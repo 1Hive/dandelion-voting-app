@@ -50,11 +50,15 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         DANDELION_VOTING_CHANGE_SUPP_TOO_BIG: "DANDELION_VOTING_CHANGE_SUPP_TOO_BIG",
         DANDELION_VOTING_CAN_NOT_VOTE: "DANDELION_VOTING_CAN_NOT_VOTE",
         DANDELION_VOTING_CAN_NOT_EXECUTE: "DANDELION_VOTING_CAN_NOT_EXECUTE",
-        DANDELION_VOTING_CAN_NOT_FORWARD: "DANDELION_VOTING_CAN_NOT_FORWARD"
+        DANDELION_VOTING_CAN_NOT_FORWARD: "DANDELION_VOTING_CAN_NOT_FORWARD",
+        DANDELION_VOTING_ORACLE_SENDER_MISSING: "DANDELION_VOTING_ORACLE_SENDER_MISSING",
+        DANDELION_VOTING_ORACLE_SENDER_TOO_BIG: "DANDELION_VOTING_ORACLE_SENDER_TOO_BIG",
+        DANDELION_VOTING_ORACLE_SENDER_ZERO: "DANDELION_VOTING_ORACLE_SENDER_ZERO"
     })
 
     const voteDurationBlocks = 500
     const bufferBlocks = 100
+    const executionPeriod = bufferBlocks / 2;
     const executionDelayBlocks = 200
 
     before(async () => {
@@ -161,8 +165,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
     })
 
-    for (const decimals of [0]) {
-    // for (const decimals of [0, 2, 18, 26]) {
+    for (const decimals of [0, 2, 18, 26]) {
         context(`normal token supply, ${decimals} decimals`, () => {
             const neededSupport = pct16(50)
             const minimumAcceptanceQuorum = pct16(20)
@@ -320,6 +323,11 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     const currentBalance = await token.balanceOf(holder29)
                     assert.equal(state[7].toString(), bigExp(28, decimals).toString(), 'current balance should have been added')
                     assert.equal(currentBalance.toNumber(), bigExp(28, decimals).toNumber(), 'balance should be 28 at current block')
+                })
+
+                it('throws when voter stake becomes 0 after vote start', async () => {
+                    await token.transfer(nonHolder, bigExp(29, decimals), { from: holder29 })
+                    await assertRevert(voting.vote(voteId, true, { from: holder29 }), errors.DANDELION_VOTING_CAN_NOT_VOTE)
                 })
 
                 it('throws when non-holder votes', async () => {
@@ -519,6 +527,19 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
                 describe('ACLOracle canPerform()', () => {
 
+                    it('reverts when passed empty address array', async () => {
+                        await assertRevert(voting.canPerform(ANY_ADDR, ANY_ADDR, "", []), errors.DANDELION_VOTING_ORACLE_SENDER_MISSING)
+                    })
+
+                    it('reverts when passed uint is out of available address range', async () => {
+                        const outOfRangeAddressAsInt = new web3.BigNumber(2).toPower(160)
+                        await assertRevert(voting.canPerform(ANY_ADDR, ANY_ADDR, "", [outOfRangeAddressAsInt]), errors.DANDELION_VOTING_ORACLE_SENDER_TOO_BIG)
+                    })
+
+                    it('reverts when passed 0 as address', async () => {
+                        await assertRevert(voting.canPerform(ANY_ADDR, ANY_ADDR, "", [0]), errors.DANDELION_VOTING_ORACLE_SENDER_ZERO)
+                    })
+
                     it('returns true when not voted in any votes', async () => {
                         assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
                     })
@@ -548,6 +569,20 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     it('returns false when voted yea and vote finished but not executed', async () => {
                         await voting.vote(voteId, true, { from: holder29 })
                         await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+
+                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
+                    })
+
+                    it('returns true when voted yea and vote not executed but execution period passed', async() => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks + executionPeriod)
+
+                        assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
+                    })
+
+                    it('returns false when voted yea and vote finished, not executed and before execution period passed', async() => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks + executionPeriod - 2)
 
                         assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
                     })
@@ -589,13 +624,6 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
                         assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
                     })
-
-                    // it('returns false when voted yea on most recent vote and address passed as argument', async () => {
-                    //     await voting.vote(voteId, false, { from: holder20 })
-                    //     await voting.vote(voteId, true, { from: holder29 })
-                    //
-                    //     assert.isFalse(await voting.canPerform(holder29, ANY_ADDR, "", []))
-                    // })
                 })
             })
         })
