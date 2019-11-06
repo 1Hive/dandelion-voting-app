@@ -379,39 +379,6 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     await assertRevert(voting.executeVote(voteId), errors.DANDELION_VOTING_CAN_NOT_EXECUTE)
                 })
 
-
-                // TODO: Fix test and behaviour!
-                // it('cannot execute vote before previous successful vote has executed', async () => {
-                //     await voting.vote(voteId, true, { from: holder51 })
-                //     await voting.mockAdvanceBlocks(bufferBlocks)
-                //     const newVoteId = createdVoteId(await voting.newVote(script, 'metadata', true, { from: holder51 }));
-                //     await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
-                //
-                //     await assertRevert(voting.executeVote(newVoteId), errors.DANDELION_VOTING_CAN_NOT_EXECUTE)
-                // })
-
-                it('can execute vote once previous successful vote has executed', async () => {
-                    await voting.vote(voteId, true, { from: holder51 })
-                    await voting.mockAdvanceBlocks(bufferBlocks)
-                    const newVoteId = createdVoteId(await voting.newVote(script, 'metadata', true, { from: holder51 }));
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
-
-                    await voting.executeVote(voteId)
-                    await voting.executeVote(newVoteId)
-
-                    assert.equal((await executionTarget.counter()).toNumber(), 4, 'should have executed script 4 times')
-                })
-
-                it('can execute vote if previous vote failed', async () => {
-                    await voting.mockAdvanceBlocks(bufferBlocks)
-                    const newVoteId = createdVoteId(await voting.newVote(script, 'metadata', true, { from: holder51 }));
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
-
-                    await voting.executeVote(newVoteId)
-
-                    assert.equal((await executionTarget.counter()).toNumber(), 2, 'should have executed script 2 times')
-                })
-
                 it('cannot execute vote twice', async () => {
                     await voting.vote(voteId, true, { from: holder51 })
                     await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)

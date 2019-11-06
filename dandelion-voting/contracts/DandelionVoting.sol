@@ -259,12 +259,12 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
         address sender = address(_how[0]);
 
         uint256 senderLastYeaVoteId = lastYeaVoteId[sender];
-        Vote storage senderLatestYeaVote = votes[senderLastYeaVoteId];
-        bool senderLatestYeaVoteFinished = getBlockNumber64() > senderLatestYeaVote.startBlock.add(voteDurationBlocks);
-        bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote);
-        bool senderLatestYeaVoteExecutionPeriodPassed = _hasVoteExecutionPeriodPassed(senderLatestYeaVote);
+        Vote storage senderLatestYeaVote_ = votes[senderLastYeaVoteId];
+        bool senderLatestYeaVoteFinished = getBlockNumber64() > senderLatestYeaVote_.startBlock.add(voteDurationBlocks);
+        bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote_);
+        bool senderLatestYeaVoteExecutionPeriodPassed = getBlockNumber64() > senderLatestYeaVote_.executionBlock.add(voteBufferBlocks.div(2));
 
-        return senderLatestYeaVoteFinished && senderLatestYeaVoteFailed || senderLatestYeaVote.executed || senderLatestYeaVoteExecutionPeriodPassed;
+        return senderLatestYeaVoteFinished && senderLatestYeaVoteFailed || senderLatestYeaVote_.executed || senderLatestYeaVoteExecutionPeriodPassed;
     }
 
     // Getter fns
@@ -409,15 +409,6 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
         // This will always be later than the end of the previous vote
         if (getBlockNumber64() < vote_.executionBlock) {
             return false;
-        }
-
-        // Votes must be executed in the order they are created
-        if (_voteId > 1) {
-            Vote storage previousVote_ = votes[_voteId - 1];
-            bool beforePreviousVoteExecutionPeriodPassed = !_hasVoteExecutionPeriodPassed(previousVote_);
-            if (beforePreviousVoteExecutionPeriodPassed && _votePassed(previousVote_) && !previousVote_.executed) {
-                return false;
-            }
         }
 
         return _votePassed(vote_);
