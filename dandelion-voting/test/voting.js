@@ -56,7 +56,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         DANDELION_VOTING_ORACLE_SENDER_ZERO: "DANDELION_VOTING_ORACLE_SENDER_ZERO"
     })
 
-    const voteDurationBlocks = 500
+    const durationBlocks = 500
     const bufferBlocks = 100
     const executionPeriod = bufferBlocks / 2;
     const executionDelayBlocks = 200
@@ -101,19 +101,19 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         beforeEach(async () => {
             token = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'n', 0, 'n', true) // empty parameters minime
 
-            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks)
+            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
 
             executionTarget = await ExecutionTarget.new()
         })
 
         it('fails on reinitialization', async () => {
-            await assertRevert(voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks), errors.INIT_ALREADY_INITIALIZED)
+            await assertRevert(voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks), errors.INIT_ALREADY_INITIALIZED)
         })
 
         it('cannot initialize base app', async () => {
             const newVoting = await Voting.new()
             assert.isTrue(await newVoting.isPetrified())
-            await assertRevert(newVoting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks), errors.INIT_ALREADY_INITIALIZED)
+            await assertRevert(newVoting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks), errors.INIT_ALREADY_INITIALIZED)
         })
 
         it('checks it is forwarder', async () => {
@@ -149,10 +149,10 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
         it('can change vote buffer blocks', async () => {
             const expectedBufferBlocks = 30
-            const receipt = await voting.changeVoteBufferBlocks(expectedBufferBlocks)
-            assertAmountOfEvents(receipt, 'ChangeVoteBufferBlocks')
+            const receipt = await voting.changeBufferBlocks(expectedBufferBlocks)
+            assertAmountOfEvents(receipt, 'ChangeBufferBlocks')
 
-            assert.equal(await voting.voteBufferBlocks(), expectedBufferBlocks, 'should have changed buffer blocks')
+            assert.equal(await voting.bufferBlocks(), expectedBufferBlocks, 'should have changed buffer blocks')
         })
 
         it('can change execution delay blocks', async () => {
@@ -165,7 +165,8 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
     })
 
-    for (const decimals of [0, 2, 18, 26]) {
+    for (const decimals of [0]) {
+    // for (const decimals of [0, 2, 18, 26]) {
         context(`normal token supply, ${decimals} decimals`, () => {
             const neededSupport = pct16(50)
             const minimumAcceptanceQuorum = pct16(20)
@@ -177,7 +178,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 await token.generateTokens(holder29, bigExp(29, decimals))
                 await token.generateTokens(holder51, bigExp(51, decimals))
 
-                await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks)
+                await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
 
                 executionTarget = await ExecutionTarget.new()
             })
@@ -186,7 +187,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 const action = { to: executionTarget.address, calldata: executionTarget.contract.execute.getData() }
                 const script = encodeCallScript([action, action, action])
                 const voteId = createdVoteId(await voting.newVote(script, '', true, { from: holder51 }))
-                await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
                 await voting.executeVote(voteId)
                 assert.equal(await executionTarget.counter(), 3, 'should have executed multiple times')
             })
@@ -200,7 +201,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 let script = encodeCallScript([action])
                 script = script.slice(0, -2) // remove one byte from calldata for it to fail
                 const voteId = createdVoteId(await voting.newVote(script, '', true, { from: holder51 }))
-                await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
                 await assertRevert(voting.executeVote(voteId))
             })
 
@@ -234,7 +235,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     assert.isTrue(isOpen, 'vote should be open')
                     assert.isFalse(isExecuted, 'vote should not be executed')
                     assert.equal(startBlock.toString(), await getBlockNumber(), 'start block should be correct')
-                    assert.equal(executionBlock.toString(), startBlock.toNumber() + executionDelayBlocks + voteDurationBlocks, 'execution block should be correct')
+                    assert.equal(executionBlock.toString(), startBlock.toNumber() + executionDelayBlocks + durationBlocks, 'execution block should be correct')
                     assert.equal(creator, holder51, 'creator should be correct')
                     assert.equal(snapshotBlock.toString(), await getBlockNumber() - 1, 'snapshot block should be correct')
                     assert.equal(supportRequired.toString(), neededSupport.toString(), 'required support should be app required support')
@@ -260,7 +261,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     await voting.vote(voteId, true, { from: holder51 })
                     await voting.vote(voteId, true, { from: holder20 })
                     await voting.vote(voteId, false, { from: holder29 })
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                    await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
 
                     const state = await voting.getVote(voteId)
                     assert.equal(state[5].toString(), neededSupport.toString(), 'required support in vote should stay equal')
@@ -275,7 +276,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     // it will succeed
 
                     await voting.vote(voteId, true, { from: holder29 })
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                    await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
 
                     const state = await voting.getVote(voteId)
                     assert.equal(state[6].toString(), minimumAcceptanceQuorum.toString(), 'acceptance quorum in vote should stay equal')
@@ -286,10 +287,10 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     await voting.changeExecutionDelayBlocks(30)
 
                     await voting.vote(voteId, true, { from: holder29 })
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                    await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
 
                     const state = await voting.getVote(voteId)
-                    const expectedExecutionBlock = state[2].toNumber() + executionDelayBlocks + voteDurationBlocks
+                    const expectedExecutionBlock = state[2].toNumber() + executionDelayBlocks + durationBlocks
                     assert.equal(state[3].toString(), expectedExecutionBlock.toString(), 'execution blocks in vote should not change')
                     await voting.executeVote(voteId) // exec doesn't fail
                 })
@@ -335,7 +336,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 })
 
                 it('throws when voting after voting closes', async () => {
-                    await voting.mockAdvanceBlocks(voteDurationBlocks)
+                    await voting.mockAdvanceBlocks(durationBlocks)
                     await assertRevert(voting.vote(voteId, true, { from: holder29 }), errors.DANDELION_VOTING_CAN_NOT_VOTE)
                 })
 
@@ -352,21 +353,21 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 it('can execute if vote is approved with support and quorum and execution delay has passed', async () => {
                     await voting.vote(voteId, true, { from: holder29 })
                     await voting.vote(voteId, false, { from: holder20 })
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                    await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
                     await voting.executeVote(voteId)
                     assert.equal(await executionTarget.counter(), 2, 'should have executed result')
                 })
 
                 it('cannot execute vote if not enough quorum met', async () => {
                     await voting.vote(voteId, true, { from: holder20 })
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                    await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
                     await assertRevert(voting.executeVote(voteId), errors.DANDELION_VOTING_CAN_NOT_EXECUTE)
                 })
 
                 it('cannot execute vote if not support met', async () => {
                     await voting.vote(voteId, false, { from: holder29 })
                     await voting.vote(voteId, false, { from: holder20 })
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                    await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
                     await assertRevert(voting.executeVote(voteId), errors.DANDELION_VOTING_CAN_NOT_EXECUTE)
                 })
 
@@ -375,19 +376,19 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     const blocksSinceVoteCreation = 4
                     await voting.vote(voteId, true, { from: holder29 })
                     await voting.vote(voteId, false, { from: holder20 })
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks - blocksSinceVoteCreation)
+                    await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks - blocksSinceVoteCreation)
                     await assertRevert(voting.executeVote(voteId), errors.DANDELION_VOTING_CAN_NOT_EXECUTE)
                 })
 
                 it('cannot execute vote twice', async () => {
                     await voting.vote(voteId, true, { from: holder51 })
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                    await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
                     await voting.executeVote(voteId)
                     await assertRevert(voting.executeVote(voteId), errors.DANDELION_VOTING_CAN_NOT_EXECUTE)
                 })
 
                 it('cannot execute unvoted finished vote', async () => {
-                    await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                    await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
                     await assertRevert(voting.executeVote(voteId), errors.DANDELION_VOTING_CAN_NOT_EXECUTE)
                 })
 
@@ -451,15 +452,15 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 it("last yea vote id for voter set to voteId of vote voted for", async () => {
                     await voting.vote(voteId, true, { from: holder29 })
 
-                    const actualLastYeaVoteId = await voting.lastYeaVoteId(holder29)
-                    assert.equal(actualLastYeaVoteId.toString(), voteId.toString())
+                    const actualLatestYeaVoteId = await voting.latestYeaVoteId(holder29)
+                    assert.equal(actualLatestYeaVoteId.toString(), voteId.toString())
                 })
 
                 it("last yea vote id for voter not set when voted against", async () => {
                     await voting.vote(voteId, false, { from: holder29 })
 
-                    const actualLastYeaVoteId = await voting.lastYeaVoteId(holder29)
-                    assert.equal(actualLastYeaVoteId.toString(), 0)
+                    const actualLatestYeaVoteId = await voting.latestYeaVoteId(holder29)
+                    assert.equal(actualLatestYeaVoteId.toString(), 0)
                 })
 
                 describe("last yea voteId on second vote", () => {
@@ -476,9 +477,9 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
                         await voting.vote(secondVoteId, true, { from: holder29 })
 
-                        const actualLastYeaVoteId = await voting.lastYeaVoteId(holder29)
-                        assert.equal(actualLastYeaVoteId.toString(), secondVoteId.toString())
-                        assert.notEqual(actualLastYeaVoteId.toString(), voteId.toString())
+                        const actualLatestYeaVoteId = await voting.latestYeaVoteId(holder29)
+                        assert.equal(actualLatestYeaVoteId.toString(), secondVoteId.toString())
+                        assert.notEqual(actualLatestYeaVoteId.toString(), voteId.toString())
                     })
 
                     it("doesn't update when second voteId less than voted on voteId", async () => {
@@ -486,9 +487,9 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
                         await voting.vote(voteId, true, { from: holder29 })
 
-                        const actualLastYeaVoteId = await voting.lastYeaVoteId(holder29)
-                        assert.equal(actualLastYeaVoteId.toString(), secondVoteId.toString())
-                        assert.notEqual(actualLastYeaVoteId.toString(), voteId.toString())
+                        const actualLatestYeaVoteId = await voting.latestYeaVoteId(holder29)
+                        assert.equal(actualLatestYeaVoteId.toString(), secondVoteId.toString())
+                        assert.notEqual(actualLatestYeaVoteId.toString(), voteId.toString())
                     })
                 })
 
@@ -498,7 +499,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                         await assertRevert(voting.canPerform(ANY_ADDR, ANY_ADDR, "", []), errors.DANDELION_VOTING_ORACLE_SENDER_MISSING)
                     })
 
-                    it('reverts when passed uint is out of available address range', async () => {
+                    it('reverts when passed uint is out of range', async () => {
                         const outOfRangeAddressAsInt = new web3.BigNumber(2).toPower(160)
                         await assertRevert(voting.canPerform(ANY_ADDR, ANY_ADDR, "", [outOfRangeAddressAsInt]), errors.DANDELION_VOTING_ORACLE_SENDER_TOO_BIG)
                     })
@@ -520,14 +521,14 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     it('returns true when voted yea and vote finished but failed', async () => {
                         await voting.vote(voteId, true, { from: holder20 })
                         await voting.vote(voteId, false, { from: holder29 })
-                        await voting.mockAdvanceBlocks(voteDurationBlocks)
+                        await voting.mockAdvanceBlocks(durationBlocks)
 
                         assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder20]))
                     })
 
                     it('returns true when voted yea and vote finished and executed', async () => {
                         await voting.vote(voteId, true, { from: holder29 })
-                        await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
                         await voting.executeVote(voteId)
 
                         assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
@@ -535,21 +536,21 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
                     it('returns false when voted yea and vote finished but not executed', async () => {
                         await voting.vote(voteId, true, { from: holder29 })
-                        await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks)
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
 
                         assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
                     })
 
                     it('returns true when voted yea and vote not executed but execution period passed', async() => {
                         await voting.vote(voteId, true, { from: holder29 })
-                        await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks + executionPeriod)
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks + executionPeriod)
 
                         assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
                     })
 
                     it('returns false when voted yea and vote finished, not executed and before execution period passed', async() => {
                         await voting.vote(voteId, true, { from: holder29 })
-                        await voting.mockAdvanceBlocks(voteDurationBlocks + executionDelayBlocks + executionPeriod - 2)
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks + executionPeriod - 2)
 
                         assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
                     })
@@ -604,13 +605,13 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         it('fails if min acceptance quorum is greater than min support', async () => {
             const neededSupport = pct16(20)
             const minimumAcceptanceQuorum = pct16(50)
-            await assertRevert(voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks), errors.DANDELION_VOTING_INIT_PCTS)
+            await assertRevert(voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks), errors.DANDELION_VOTING_INIT_PCTS)
         })
 
         it('fails if min support is 100% or more', async () => {
             const minimumAcceptanceQuorum = pct16(20)
-            await assertRevert(voting.initialize(token.address, pct16(101), minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks), errors.DANDELION_VOTING_INIT_SUPPORT_TOO_BIG)
-            await assertRevert(voting.initialize(token.address, pct16(100), minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks), errors.DANDELION_VOTING_INIT_SUPPORT_TOO_BIG)
+            await assertRevert(voting.initialize(token.address, pct16(101), minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks), errors.DANDELION_VOTING_INIT_SUPPORT_TOO_BIG)
+            await assertRevert(voting.initialize(token.address, pct16(100), minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks), errors.DANDELION_VOTING_INIT_SUPPORT_TOO_BIG)
         })
     })
 
@@ -621,7 +622,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         beforeEach(async() => {
             token = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'n', 0, 'n', true) // empty parameters minime
 
-            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks)
+            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
         })
 
         it('prevents voting if token has no holder', async () => {
@@ -642,7 +643,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
             await token.generateTokens(holder1, 1)
 
-            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks)
+            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
         })
 
         it('new vote cannot be executed after only possible voter has voted', async () => {
@@ -670,7 +671,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             await token.generateTokens(holder1, 1)
             await token.generateTokens(holder2, 2)
 
-            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks)
+            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
         })
 
         it('new vote cannot be executed before holder2 voting', async () => {
@@ -706,7 +707,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             await token.generateTokens(holder1, 1)
             await token.generateTokens(holder2, 1)
 
-            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, voteDurationBlocks, bufferBlocks, executionDelayBlocks)
+            await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
         })
 
         it('uses the correct snapshot value if tokens are minted afterwards', async () => {

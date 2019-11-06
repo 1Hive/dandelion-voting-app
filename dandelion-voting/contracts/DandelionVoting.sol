@@ -58,21 +58,21 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     MiniMeToken public token;
     uint64 public supportRequiredPct;
     uint64 public minAcceptQuorumPct;
-    uint64 public voteDurationBlocks;
-    uint64 public voteBufferBlocks;
+    uint64 public durationBlocks;
+    uint64 public bufferBlocks;
     uint64 public executionDelayBlocks;
 
     // We are mimicing an array, we use a mapping instead to make app upgrade more graceful
     mapping (uint256 => Vote) internal votes;
     uint256 public votesLength;
-    mapping (address => uint256) public lastYeaVoteId;
+    mapping (address => uint256) public latestYeaVoteId;
 
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
     event ExecuteVote(uint256 indexed voteId);
     event ChangeSupportRequired(uint64 supportRequiredPct);
     event ChangeMinQuorum(uint64 minAcceptQuorumPct);
-    event ChangeVoteBufferBlocks(uint64 voteBufferBlocks);
+    event ChangeBufferBlocks(uint64 bufferBlocks);
     event ChangeExecutionDelayBlocks(uint64 executionDelayBlocks);
 
     modifier voteExists(uint256 _voteId) {
@@ -86,16 +86,16 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     * @param _token MiniMeToken Address that will be used as governance token
     * @param _supportRequiredPct Percentage of yeas in casted votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
     * @param _minAcceptQuorumPct Percentage of yeas in total possible votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
-    * @param _voteDurationBlocks Blocks that a vote will be open for token holders to vote
-    * @param _voteBufferBlocks Minimum number of blocks between the start block of each vote
+    * @param _durationBlocks Blocks that a vote will be open for token holders to vote
+    * @param _bufferBlocks Minimum number of blocks between the start block of each vote
     * @param _executionDelayBlocks Minimum number of blocks between the end of a vote and when it can be executed
     */
     function initialize(
         MiniMeToken _token,
         uint64 _supportRequiredPct,
         uint64 _minAcceptQuorumPct,
-        uint64 _voteDurationBlocks,
-        uint64 _voteBufferBlocks,
+        uint64 _durationBlocks,
+        uint64 _bufferBlocks,
         uint64 _executionDelayBlocks
     )
         external
@@ -109,8 +109,8 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
         token = _token;
         supportRequiredPct = _supportRequiredPct;
         minAcceptQuorumPct = _minAcceptQuorumPct;
-        voteDurationBlocks = _voteDurationBlocks;
-        voteBufferBlocks = _voteBufferBlocks;
+        durationBlocks = _durationBlocks;
+        bufferBlocks = _bufferBlocks;
         executionDelayBlocks = _executionDelayBlocks;
     }
 
@@ -145,11 +145,11 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
 
     /**
     * @notice Change vote buffer to `_voteBufferBlocks` blocks
-    * @param _voteBufferBlocks New vote buffer defined in blocks
+    * @param _bufferBlocks New vote buffer defined in blocks
     */
-    function changeVoteBufferBlocks(uint64 _voteBufferBlocks) external auth(MODIFY_BUFFER_BLOCKS_ROLE) {
-        voteBufferBlocks = _voteBufferBlocks;
-        emit ChangeVoteBufferBlocks(_voteBufferBlocks);
+    function changeBufferBlocks(uint64 _bufferBlocks) external auth(MODIFY_BUFFER_BLOCKS_ROLE) {
+        bufferBlocks = _bufferBlocks;
+        emit ChangeBufferBlocks(_bufferBlocks);
     }
 
     /**
@@ -258,11 +258,11 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
         require(_how[0] != 0, ERROR_ORACLE_SENDER_ZERO);
         address sender = address(_how[0]);
 
-        uint256 senderLastYeaVoteId = lastYeaVoteId[sender];
-        Vote storage senderLatestYeaVote_ = votes[senderLastYeaVoteId];
-        bool senderLatestYeaVoteFinished = getBlockNumber64() > senderLatestYeaVote_.startBlock.add(voteDurationBlocks);
+        uint256 senderLatestYeaVoteId = latestYeaVoteId[sender];
+        Vote storage senderLatestYeaVote_ = votes[senderLatestYeaVoteId];
+        bool senderLatestYeaVoteFinished = getBlockNumber64() > senderLatestYeaVote_.startBlock.add(durationBlocks);
         bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote_);
-        bool senderLatestYeaVoteExecutionPeriodPassed = getBlockNumber64() > senderLatestYeaVote_.executionBlock.add(voteBufferBlocks.div(2));
+        bool senderLatestYeaVoteExecutionPeriodPassed = getBlockNumber64() > senderLatestYeaVote_.executionBlock.add(bufferBlocks.div(2));
 
         return senderLatestYeaVoteFinished && senderLatestYeaVoteFailed || senderLatestYeaVote_.executed || senderLatestYeaVoteExecutionPeriodPassed;
     }
@@ -353,10 +353,10 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
         voteId = ++votesLength; // Increment votesLength before assigning to votedId. The first voteId is 1.
 
         uint64 previousVoteStartBlock = votes[voteId - 1].startBlock;
-        uint64 earliestStartBlock = previousVoteStartBlock == 0 ? 0 : previousVoteStartBlock.add(voteBufferBlocks);
+        uint64 earliestStartBlock = previousVoteStartBlock == 0 ? 0 : previousVoteStartBlock.add(bufferBlocks);
         uint64 startBlock = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
 
-        uint64 executionBlock = startBlock.add(voteDurationBlocks).add(executionDelayBlocks);
+        uint64 executionBlock = startBlock.add(durationBlocks).add(executionDelayBlocks);
 
         Vote storage vote_ = votes[voteId];
         vote_.startBlock = startBlock;
@@ -383,8 +383,8 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
 
         if (_supports) {
             vote_.yea = vote_.yea.add(voterStake);
-            if (lastYeaVoteId[_voter] < _voteId) {
-                lastYeaVoteId[_voter] = _voteId;
+            if (latestYeaVoteId[_voter] < _voteId) {
+                latestYeaVoteId[_voter] = _voteId;
             }
         } else {
             vote_.nay = vote_.nay.add(voterStake);
@@ -412,14 +412,6 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
         }
 
         return _votePassed(vote_);
-    }
-
-    /**
-    * @dev Internal function to check if vote execution period has passed, necessary if a vote script cannot be executed.
-    * @return True if the given votes execution period has passed, false otherwise
-    */
-    function _hasVoteExecutionPeriodPassed(Vote storage vote_) internal view returns (bool) {
-        return getBlockNumber64() > vote_.executionBlock.add(voteBufferBlocks.div(2));
     }
 
     /**
@@ -466,7 +458,7 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
         uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
-        return votingPowerAtSnapshot > 0 && getBlockNumber64() >= vote_.startBlock && getBlockNumber64() < vote_.startBlock.add(voteDurationBlocks);
+        return votingPowerAtSnapshot > 0 && getBlockNumber64() >= vote_.startBlock && getBlockNumber64() < vote_.startBlock.add(durationBlocks);
     }
 
     /**
