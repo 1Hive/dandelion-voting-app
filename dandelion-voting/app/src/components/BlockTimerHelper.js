@@ -1,11 +1,11 @@
 import React from 'react'
 import { Help } from '@aragon/ui'
-import { useBlockTime, useBlockLatest } from '../hooks/useBlock'
+import { useBlockTime, useLatestBlock } from '../hooks/useBlock'
 import { getVoteRemainingBlocks } from '../vote-utils'
 
 const BlockTimerHelper = ({ vote }) => {
   const { upcoming, delayed } = vote.data
-  const { number: currentBlockNumber } = useBlockLatest()
+  const { number: currentBlockNumber } = useLatestBlock()
   const blockTime = useBlockTime()
 
   const remainingBlocks = getVoteRemainingBlocks(vote.data, currentBlockNumber)

@@ -3,11 +3,7 @@ import { useApi, useNetwork } from '@aragon/api-react'
 
 import usePromise from './usePromise'
 import useInterval from './useInterval'
-import {
-  loadBlockTimestamp,
-  loadBlockNumber,
-  loadBlockLatest,
-} from '../web3-utils'
+import { loadBlockTimestamp, loadLatestBlock } from '../web3-utils'
 
 const NETWORK_TIMES = new Map([
   ['main', 13.5],
@@ -25,13 +21,13 @@ export function useBlockTime() {
   ])
 }
 
-export function useBlockLatest(updateEvery = 1000) {
+export function useLatestBlock(updateEvery = 1000) {
   const api = useApi()
   const [block, setBlock] = useState({ number: 0, timeStamp: 0 })
 
   useInterval(
     async () => {
-      const { number, timestamp } = api ? await loadBlockLatest(api) : block
+      const { number, timestamp } = api ? await loadLatestBlock(api) : block
       // Prevent unnecessary re-renders
       if (number !== block.number) setBlock({ number, timestamp })
     },
@@ -40,17 +36,6 @@ export function useBlockLatest(updateEvery = 1000) {
   )
 
   return block
-}
-
-export function useBlockNumber(updateEvery = 1000) {
-  const api = useApi()
-  const [blockNumber, setBlockNumber] = useState(0)
-
-  useInterval(async () => {
-    setBlockNumber(await loadBlockNumber(api))
-  }, updateEvery)
-
-  return blockNumber
 }
 
 export function useBlockTimeStamp(blockNumber, load = false) {

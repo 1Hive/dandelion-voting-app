@@ -3,7 +3,7 @@ import { useAppState, useCurrentApp, useInstalledApps } from '@aragon/api-react'
 import { getVoteTransition } from '../vote-utils'
 import { VOTE_ABSENT } from '../vote-types'
 import { EMPTY_ADDRESS } from '../web3-utils'
-import { useBlockTime, useBlockLatest } from './useBlock'
+import { useBlockTime, useLatestBlock } from './useBlock'
 
 // Temporary fix to make sure executionTargets always returns an array, until
 // we find out the reason why it can sometimes be missing in the cached data.
@@ -91,7 +91,7 @@ function useDecoratedVotes() {
 // Get the votes array ready to be used in the app.
 export default function useVotes() {
   const [votes, executionTargets] = useDecoratedVotes()
-  const latestBlock = useBlockLatest()
+  const latestBlock = useLatestBlock()
   const blockTime = useBlockTime()
 
   const voteStates = useMemo(
