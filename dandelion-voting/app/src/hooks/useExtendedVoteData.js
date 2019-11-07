@@ -4,6 +4,7 @@ import { getUserBalanceAt, getUserBalanceNow } from '../token-utils'
 import { getCanExecute, getCanVote } from '../vote-utils'
 import useTokenContract from './useTokenContract'
 import usePromise from './usePromise'
+import { useBlockTimeStamp } from './useBlock'
 
 // Get the extended data related to a vote
 export default function useExtendedVoteData(vote) {
@@ -43,6 +44,8 @@ export default function useExtendedVoteData(vote) {
   )
   const userBalanceNow = usePromise(userBalanceNowPromise, [], -1)
 
+  const startTimestamp = useBlockTimeStamp(vote.data.startBlock, vote.data.open)
+
   return {
     canExecute,
     canUserVote,
@@ -52,5 +55,6 @@ export default function useExtendedVoteData(vote) {
     userBalanceNowPromise,
     canUserVotePromise,
     canExecutePromise,
+    startTimestamp,
   }
 }

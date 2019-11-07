@@ -9,42 +9,22 @@ import VoteStatus from '../VoteStatus'
 import VoteText from '../VoteText'
 import You from '../You'
 import BlockTimerHelper from '../BlockTimerHelper'
-import { useAppState } from '@aragon/api-react'
-import useBlockTime from '../../hooks/useBlockTime'
-import { isVoteAction } from '../../vote-utils'
-import { start } from 'repl'
+import { getVoteSuccess } from '../../vote-utils'
+import { useSettings } from '../../vote-settings-manager'
 
 const VoteCard = ({ vote, onOpen }) => {
-  const { voteDurationBlocks } = useAppState()
-  const blockTime = useBlockTime()
   const theme = useTheme()
+  const { pctBase } = useSettings()
 
   const {
     connectedAccountVote,
     data,
     executionTargetData,
     numData,
-    voteId
+    voteId,
   } = vote
   const { votingPower, yea, nay } = numData
-  const {
-    open,
-    metadata,
-    description,
-    startDate,
-    pending,
-    delayed,
-    pendingStartDate,
-    allowedToExcuteDate
-  } = data
-
-  const endDate = pending
-    ? pendingStartDate
-    : delayed
-    ? allowedToExcuteDate
-    : startDate
-    ? new Date(startDate + voteDurationBlocks * blockTime * 1000)
-    : null
+  const { metadata, description, delayed, closed, transitionAt } = data
 
   const options = useMemo(
     () => [
@@ -55,7 +35,7 @@ const VoteCard = ({ vote, onOpen }) => {
             {connectedAccountVote === VOTE_YEA && <You />}
           </WrapVoteOption>
         ),
-        power: yea
+        power: yea,
       },
       {
         label: (
@@ -65,8 +45,8 @@ const VoteCard = ({ vote, onOpen }) => {
           </WrapVoteOption>
         ),
         power: nay,
-        color: theme.negative
-      }
+        color: theme.negative,
+      },
     ],
     [yea, nay, theme, connectedAccountVote]
   )
@@ -114,7 +94,7 @@ const VoteCard = ({ vote, onOpen }) => {
               color: ${theme.info};
             `}
           >
-            <IconCheck size='tiny' />
+            <IconCheck size="tiny" />
           </div>
         )}
       </div>
@@ -130,7 +110,7 @@ const VoteCard = ({ vote, onOpen }) => {
           overflow: hidden;
         `}
       >
-        <span css='font-weight: bold;'>#{voteId}:</span>{' '}
+        <span css="font-weight: bold;">#{voteId}:</span>{' '}
         <VoteText disabled text={description || metadata} />
       </div>
       <VoteOptions options={options} votingPower={votingPower} />
@@ -139,19 +119,22 @@ const VoteCard = ({ vote, onOpen }) => {
           margin-top: ${2 * GU}px;
         `}
       >
-        {open || pending || (delayed && isVoteAction(vote)) ? (
-          <div
-            css={`
-              display: flex;
-              justify-content: space-between;
-            `}
-          >
-            {endDate && <Timer end={endDate} maxUnits={4} />}
-
-            {endDate && <BlockTimerHelper vote={vote} blockTime={blockTime} />}
-          </div>
+        {!closed || (delayed && getVoteSuccess(vote, pctBase)) ? (
+          transitionAt ? (
+            <div
+              css={`
+                display: flex;
+                justify-content: space-between;
+              `}
+            >
+              <Timer end={transitionAt} maxUnits={4} />
+              <BlockTimerHelper vote={vote} />
+            </div>
+          ) : (
+            <TimerPlaceholder />
+          )
         ) : (
-          !delayed && <VoteStatus vote={vote} />
+          <VoteStatus vote={vote} />
         )}
       </div>
     </Card>
@@ -159,7 +142,7 @@ const VoteCard = ({ vote, onOpen }) => {
 }
 
 VoteCard.defaultProps = {
-  onOpen: noop
+  onOpen: noop,
 }
 
 const WrapVoteOption = styled.span`
@@ -167,6 +150,13 @@ const WrapVoteOption = styled.span`
   align-items: center;
   text-transform: uppercase;
   ${textStyle('label2')};
+`
+
+const TimerPlaceholder = styled.div`
+  background: #f1f3f7;
+  height: 20px;
+  width: 40%;
+  border-radius: 6px;
 `
 
 export default VoteCard

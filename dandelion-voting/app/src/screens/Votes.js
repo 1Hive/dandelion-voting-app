@@ -7,30 +7,26 @@ import {
   textStyle,
   useLayout,
   useTheme,
-  Split,
-  Box,
-  IconTime,
-  _DateRange as DateRange
+  _DateRange as DateRange,
 } from '@aragon/ui'
 import EmptyFilteredVotes from '../components/EmptyFilteredVotes'
 import VoteCard from '../components/VoteCard/VoteCard'
 import VoteCardGroup from '../components/VoteCard/VoteCardGroup'
-import useBlockNumber from '../hooks/useBlockNumber'
 
 const sortVotes = (a, b) => {
-  const dateDiff = b.data.endDate - a.data.endDate
-  // Order by descending voteId if there's no end date difference
+  const dateDiff = b.data.endBlock - a.data.endBlock
+  // Order by descending voteId if there's no end block difference
   return dateDiff !== 0 ? dateDiff : b.voteId - a.voteId
 }
 
 const useVotes = votes => {
   const sortedVotes = votes.sort(sortVotes)
   const openVotes = sortedVotes.filter(vote => vote.data.open)
-  const pendingVotes = sortedVotes.filter(vote => vote.data.pending)
+  const upcomingVotes = sortedVotes.filter(vote => vote.data.upcoming)
   const closedVotes = sortedVotes.filter(
-    vote => !pendingVotes.includes(vote) && !openVotes.includes(vote)
+    vote => !upcomingVotes.includes(vote) && !openVotes.includes(vote)
   )
-  return { openVotes, pendingVotes, closedVotes }
+  return { openVotes, upcomingVotes, closedVotes }
 }
 
 const Votes = React.memo(function Votes({
@@ -48,12 +44,11 @@ const Votes = React.memo(function Votes({
   handleVoteAppFilterChange,
   voteDateRangeFilter,
   handleVoteDateRangeFilterChange,
-  handleClearFilters
+  handleClearFilters,
 }) {
   const theme = useTheme()
   const { layoutName } = useLayout()
-  const currentBlockNumber = useBlockNumber()
-  const { openVotes, pendingVotes, closedVotes } = useVotes(filteredVotes)
+  const { openVotes, upcomingVotes, closedVotes } = useVotes(filteredVotes)
 
   const multipleOfTarget = executionTargets.reduce((map, { name }) => {
     map.set(name, map.has(name))
@@ -75,8 +70,8 @@ const Votes = React.memo(function Votes({
             `}
           >
             <DropDown
-              header='Status'
-              placeholder='Status'
+              header="Status"
+              placeholder="Status"
               selected={voteStatusFilter}
               onChange={handleVoteStatusFilterChange}
               items={[
@@ -92,38 +87,38 @@ const Votes = React.memo(function Votes({
                       ${textStyle('label3')};
                     `}
                   >
-                    <Tag limitDigits={4} label={votes.length} size='small' />
+                    <Tag limitDigits={4} label={votes.length} size="small" />
                   </span>
                 </div>,
                 'Open',
                 'Upcoming',
-                'Closed'
+                'Closed',
               ]}
-              width='128px'
+              width="128px"
             />
             {voteStatusFilter === 1 && (
               <DropDown
-                header='Trend'
-                placeholder='Trend'
+                header="Trend"
+                placeholder="Trend"
                 selected={voteTrendFilter}
                 onChange={handleVoteTrendFilterChange}
                 items={['All', 'Will pass', 'Won’t pass']}
-                width='128px'
+                width="128px"
               />
             )}
             {voteStatusFilter !== 1 && (
               <DropDown
-                header='Outcome'
-                placeholder='Outcome'
+                header="Outcome"
+                placeholder="Outcome"
                 selected={voteOutcomeFilter}
                 onChange={handleVoteOutcomeFilterChange}
                 items={['All', 'Passed', 'Rejected', 'Enacted', 'Pending']}
-                width='128px'
+                width="128px"
               />
             )}
             <DropDown
-              header='App'
-              placeholder='App'
+              header="App"
+              placeholder="App"
               selected={voteAppFilter}
               onChange={handleVoteAppFilterChange}
               items={[
@@ -137,9 +132,9 @@ const Votes = React.memo(function Votes({
                         : ''
                     }`
                 ),
-                'External'
+                'External',
               ]}
-              width='128px'
+              width="128px"
             />
             <DateRange
               startDate={voteDateRangeFilter.start}
@@ -156,7 +151,7 @@ const Votes = React.memo(function Votes({
         ) : (
           <VoteGroups
             openVotes={openVotes}
-            pendingVotes={pendingVotes}
+            upcomingVotes={upcomingVotes}
             closedVotes={closedVotes}
             onSelectVote={selectVote}
           />
@@ -176,7 +171,7 @@ const ThisVoting = ({ showTag }) => (
     Voting
     {showTag && (
       <Tag
-        size='small'
+        size="small"
         css={`
           margin-left: ${1 * GU}px;
         `}
@@ -188,11 +183,11 @@ const ThisVoting = ({ showTag }) => (
 )
 
 const VoteGroups = React.memo(
-  ({ openVotes, pendingVotes, closedVotes, onSelectVote }) => {
+  ({ openVotes, upcomingVotes, closedVotes, onSelectVote }) => {
     const voteGroups = [
       ['Open votes', openVotes],
-      ['Upcoming votes', pendingVotes],
-      ['Closed votes', closedVotes]
+      ['Upcoming votes', upcomingVotes],
+      ['Closed votes', closedVotes],
     ]
 
     return (

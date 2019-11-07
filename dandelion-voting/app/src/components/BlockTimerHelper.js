@@ -1,16 +1,14 @@
 import React from 'react'
 import { Help } from '@aragon/ui'
-import useBlockNumber from '../hooks/useBlockNumber'
+import { useBlockTime, useLatestBlock } from '../hooks/useBlock'
+import { getVoteRemainingBlocks } from '../vote-utils'
 
-const BlockTimerHelper = ({ vote, blockTime }) => {
-  const { data } = vote
-  const { endBlock, pending, startBlock, delayed, executionBlock } = data
-  const currentBlockNumber = useBlockNumber()
-  const remainingBlocks = pending
-    ? startBlock - currentBlockNumber
-    : delayed
-    ? executionBlock - currentBlockNumber
-    : endBlock - currentBlockNumber
+const BlockTimerHelper = ({ vote }) => {
+  const { upcoming, delayed } = vote.data
+  const { number: currentBlockNumber } = useLatestBlock()
+  const blockTime = useBlockTime()
+
+  const remainingBlocks = getVoteRemainingBlocks(vote.data, currentBlockNumber)
 
   return (
     <div
@@ -23,18 +21,18 @@ const BlockTimerHelper = ({ vote, blockTime }) => {
       `}
     >
       {delayed ? (
-        <Help hint='Why is this an estimated time?'>
+        <Help hint="Why is this an estimated time?">
           This proposal has been approved but is subject to a{' '}
           <strong>delay</strong> before it can be enacted. Enactment will be
           available after <strong>{remainingBlocks}</strong> blocks
         </Help>
       ) : (
-        <Help hint='Why is this an estimated time?'>
+        <Help hint="Why is this an estimated time?">
           Vote start and end times are determined by blocks which occur
           approximately every <strong>{blockTime}</strong> seconds, the vote
           will
-          {pending ? ' start ' : ' end '} in <strong>{remainingBlocks}</strong>{' '}
-          blocks
+          {upcoming ? ' start ' : ' end '} in <strong>{remainingBlocks}</strong>{' '}
+          block{remainingBlocks > 1 && 's'}
         </Help>
       )}
     </div>

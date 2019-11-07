@@ -6,7 +6,7 @@ import {
   IconTime,
   GU,
   textStyle,
-  useTheme
+  useTheme,
 } from '@aragon/ui'
 import { useSettings } from '../vote-settings-manager'
 import {
@@ -15,51 +15,59 @@ import {
   VOTE_STATUS_ACCEPTED,
   VOTE_STATUS_ENACTED,
   VOTE_STATUS_UPCOMING,
-  VOTE_STATUS_PENDING_ENACTMENT
+  VOTE_STATUS_PENDING_ENACTMENT,
+  VOTE_STATUS_DELAYED,
 } from '../vote-types'
 import { getVoteStatus } from '../vote-utils'
 
 const getStatusAttributes = (status, theme) => {
-  if (status === VOTE_STATUS_ONGOING) {
-    return {
-      label: 'Ongoing',
-      Icon: IconTime,
-      color: null
-    }
-  }
   if (status === VOTE_STATUS_UPCOMING) {
     return {
       label: 'Upcoming',
       Icon: IconTime,
-      color: null
+      color: null,
+    }
+  }
+  if (status === VOTE_STATUS_ONGOING) {
+    return {
+      label: 'Ongoing',
+      Icon: IconTime,
+      color: null,
+    }
+  }
+  if (status === VOTE_STATUS_DELAYED) {
+    return {
+      label: 'Delayed',
+      Icon: IconTime,
+      color: null,
     }
   }
   if (status === VOTE_STATUS_REJECTED) {
     return {
       label: 'Rejected',
       Icon: IconCross,
-      color: theme.negative
+      color: theme.negative,
     }
   }
   if (status === VOTE_STATUS_ACCEPTED) {
     return {
       label: 'Passed',
       Icon: IconCheck,
-      color: theme.positive
+      color: theme.positive,
     }
   }
   if (status === VOTE_STATUS_PENDING_ENACTMENT) {
     return {
       label: 'Passed (pending)',
       Icon: IconCheck,
-      color: theme.positive
+      color: theme.positive,
     }
   }
   if (status === VOTE_STATUS_ENACTED) {
     return {
       label: 'Passed (enacted)',
       Icon: IconCheck,
-      color: theme.positive
+      color: theme.positive,
     }
   }
 }
@@ -77,7 +85,7 @@ const VoteStatus = ({ vote }) => {
         color: ${color || theme.surfaceContentSecondary};
       `}
     >
-      {Icon && <Icon size='small' />}
+      {Icon && <Icon size="small" />}
       <StatusLabel spaced={Boolean(Icon)}>{label}</StatusLabel>
     </Main>
   )
