@@ -1,9 +1,13 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useApi, useNetwork } from '@aragon/api-react'
 
 import usePromise from './usePromise'
-import useNow from './useNow'
-import { loadBlockTimestamp, loadBlockNumber } from '../web3-utils'
+import useInterval from './useInterval'
+import {
+  loadBlockTimestamp,
+  loadBlockNumber,
+  loadBlockLatest,
+} from '../web3-utils'
 
 const NETWORK_TIMES = new Map([
   ['main', 13.5],
@@ -21,22 +25,40 @@ export function useBlockTime() {
   ])
 }
 
-export function useBlockNumber() {
+export function useBlockLatest(updateEvery = 1000) {
   const api = useApi()
-  const now = useNow()
+  const [block, setBlock] = useState({ number: 0, timeStamp: 0 })
 
-  const blockNumberPromise = useMemo(() => {
-    return loadBlockNumber(api)
-  }, [api, now]) // eslint-disable-line react-hooks/exhaustive-deps
-  return usePromise(blockNumberPromise, [], 0)
+  useInterval(
+    async () => {
+      const { number, timestamp } = api ? await loadBlockLatest(api) : block
+      // Prevent unnecessary re-renders
+      if (number !== block.number) setBlock({ number, timestamp })
+    },
+    updateEvery,
+    true
+  )
+
+  return block
 }
 
-export function useBlockTimeStamp(endBlock, closed) {
+export function useBlockNumber(updateEvery = 1000) {
   const api = useApi()
-  const endBlockTimestampPromise = useMemo(() => {
-    return closed ? loadBlockTimestamp(api, endBlock) : dummyFn
-  }, [api, closed, endBlock])
-  return usePromise(endBlockTimestampPromise, [], 0)
+  const [blockNumber, setBlockNumber] = useState(0)
+
+  useInterval(async () => {
+    setBlockNumber(await loadBlockNumber(api))
+  }, updateEvery)
+
+  return blockNumber
+}
+
+export function useBlockTimeStamp(blockNumber, load = false) {
+  const api = useApi()
+  const blockTimeStampPromise = useMemo(() => {
+    return load ? loadBlockTimestamp(api, blockNumber) : dummyFn
+  }, [api, blockNumber, load])
+  return usePromise(blockTimeStampPromise, [], 0)
 }
 
 const dummyFn = async () => {

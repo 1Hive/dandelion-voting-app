@@ -291,7 +291,7 @@ function Status({ vote }) {
             ? `Time to start `
             : open
             ? ` Time remaining`
-            : `Delayed for`}
+            : `Time for enactment`}
         </div>
         {<Timer end={transitionAt} maxUnits={4} />}
       </React.Fragment>
@@ -314,9 +314,18 @@ function Status({ vote }) {
         `}
       >
         <IconTime size="small" />{' '}
-        {dateHasLoaded
-          ? formatDate(executionDate || new Date(endBlockTimeStamp))
-          : ''}
+        {dateHasLoaded ? (
+          formatDate(executionDate || new Date(endBlockTimeStamp))
+        ) : (
+          <div
+            css={`
+              height: 25px;
+              width: 150px;
+              background: #f9fafc;
+              border-radius: 6px;
+            `}
+          />
+        )}
       </div>
       {executionTransaction && (
         <div>

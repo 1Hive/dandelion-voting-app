@@ -50,7 +50,6 @@ const Votes = React.memo(function Votes({
   const { layoutName } = useLayout()
   const { openVotes, upcomingVotes, closedVotes } = useVotes(filteredVotes)
 
-  console.log('votes', votes)
   const multipleOfTarget = executionTargets.reduce((map, { name }) => {
     map.set(name, map.has(name))
     return map

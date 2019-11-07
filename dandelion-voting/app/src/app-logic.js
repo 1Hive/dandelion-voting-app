@@ -76,7 +76,7 @@ export function useExecuteAction(onDone = noop) {
 // Handles the main logic of the app.
 export function useAppLogic() {
   const { isSyncing, ready } = useAppState()
-  const [votes, executionTargets] = useVotes()
+  const [votes, executionTargets, blockHasLoaded] = useVotes()
   const [selectedVote, selectVote] = useSelectedVote(votes)
   const newVotePanel = usePanelState()
 
@@ -92,7 +92,7 @@ export function useAppLogic() {
     selectVote,
     selectedVote,
     votes,
-    isSyncing: isSyncing || !ready,
+    isSyncing: isSyncing || !ready || !blockHasLoaded,
     newVotePanel: useMemo(() => newVotePanel, [newVotePanel]),
   }
 }

@@ -24,7 +24,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
   const { tokenSymbol } = useAppState()
 
   const { connectedAccountVote, data } = vote
-  const { snapshotBlock, startDate, open, delayed } = data
+  const { snapshotBlock, open, delayed } = data
   const {
     canUserVote,
     canExecute,
@@ -34,6 +34,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
     userBalancePromise,
     userBalanceNowPromise,
     canExecutePromise,
+    startTimestamp,
   } = useExtendedVoteData(vote)
 
   const hasVoted = [VOTE_YEA, VOTE_NAY].includes(connectedAccountVote)
@@ -68,8 +69,6 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
   if (!ready) {
     return null
   }
-  console.log(!open && !delayed && canExecute)
-  console.log(open, delayed, canExecute)
 
   if (!open) {
     return (
@@ -98,7 +97,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
             <Buttons onClickYes={onVoteYes} onClickNo={onVoteNo} />
             <TokenReference
               snapshotBlock={snapshotBlock}
-              startDate={startDate}
+              startDate={new Date(startTimestamp)}
               tokenSymbol={tokenSymbol}
               userBalance={userBalance}
               userBalanceNow={userBalanceNow}
@@ -166,9 +165,10 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
           ? 'Although the currently connected account holds tokens, it'
           : 'The currently connected account'}{' '}
         did not hold any <strong>{tokenSymbol}</strong> tokens when this vote
-        began ({formatDate(startDate)}) and therefore cannot participate in this
-        vote. Make sure your accounts are holding <strong>{tokenSymbol}</strong>{' '}
-        at the time a vote begins if you'd like to vote using this Voting app.
+        began ({formatDate(new Date(startTimestamp))}) and therefore cannot
+        participate in this vote. Make sure your accounts are holding{' '}
+        <strong>{tokenSymbol}</strong> at the time a vote begins if you'd like
+        to vote using this Voting app.
       </Info>
     </div>
   )

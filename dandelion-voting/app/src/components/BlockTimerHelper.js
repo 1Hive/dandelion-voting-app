@@ -1,10 +1,14 @@
 import React from 'react'
 import { Help } from '@aragon/ui'
-import { useBlockTime } from '../hooks/useBlock'
+import { useBlockTime, useBlockLatest } from '../hooks/useBlock'
+import { getVoteRemainingBlocks } from '../vote-utils'
 
 const BlockTimerHelper = ({ vote }) => {
-  const { upcoming, delayed, remainingBlocks } = vote.data
+  const { upcoming, delayed } = vote.data
+  const { number: currentBlockNumber } = useBlockLatest()
   const blockTime = useBlockTime()
+
+  const remainingBlocks = getVoteRemainingBlocks(vote.data, currentBlockNumber)
 
   return (
     <div
@@ -28,7 +32,7 @@ const BlockTimerHelper = ({ vote }) => {
           approximately every <strong>{blockTime}</strong> seconds, the vote
           will
           {upcoming ? ' start ' : ' end '} in <strong>{remainingBlocks}</strong>{' '}
-          blocks
+          block{remainingBlocks > 1 && 's'}
         </Help>
       )}
     </div>

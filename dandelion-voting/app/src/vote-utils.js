@@ -12,48 +12,72 @@ import {
 } from './vote-types'
 
 const EMPTY_SCRIPT = '0x00000001'
+const ONE_SECOND = 1000
 
 export function isVoteAction(vote) {
   return vote.data && vote.data.script && vote.data.script !== EMPTY_SCRIPT
 }
 
-export function getVoteTransition(vote, currentBlockNumber, blockTime) {
+export function getVoteRemainingBlocks(voteData, currentBlockNumber) {
+  const { startBlock, endBlock, executionBlock } = voteData
+
+  // All posible states
+  const { closed, delayed, upcoming, open, syncing } = voteData
+  let remainingBlocks
+
+  if ((closed && !delayed) || syncing) return 0
+
+  if (upcoming) {
+    // upcoming
+    remainingBlocks = startBlock - currentBlockNumber
+  } else if (open) {
+    // open
+    remainingBlocks = endBlock - currentBlockNumber
+  } // delayed
+  else {
+    remainingBlocks = executionBlock - currentBlockNumber
+  }
+
+  return remainingBlocks
+}
+
+export function getVoteTransition(
+  vote,
+  { number: currentBlockNumber, timestamp: currentBlockTimestamp },
+  blockTime
+) {
+  // Check if the latest block has not loaded yet (in that case assumed all closed)
+  if (!currentBlockNumber) return { closed: true }
+
   const { startBlock, endBlock, executionBlock } = vote.data
-  const blockTimeMiliseconds = blockTime * 1000
-  const now = Date.now()
+  const blockTimeMiliseconds = blockTime * ONE_SECOND
+  let state = {}
 
-  // Upcoming
-  if (currentBlockNumber < startBlock) {
-    const remainingBlocks = startBlock - currentBlockNumber
-    return {
-      upcoming: true,
-      remainingBlocks,
-      transitionAt: new Date(now + remainingBlocks * blockTimeMiliseconds),
+  if (endBlock <= currentBlockNumber) {
+    state.closed = true
+    // If not delayed, then just return closed
+    if (currentBlockNumber < executionBlock) {
+      state.delayed = true
+    } else {
+      return state
     }
+  } else if (currentBlockNumber < startBlock) {
+    state.upcoming = true
+  } else {
+    state.open = true
   }
 
-  // Open
-  if (startBlock <= currentBlockNumber && currentBlockNumber < endBlock) {
-    const remainingBlocks = endBlock - currentBlockNumber
-    console.log(remainingBlocks)
-    return {
-      open: true,
-      remainingBlocks,
-      transitionAt: new Date(now + remainingBlocks * blockTimeMiliseconds),
-    }
-  }
+  const remainingBlocks = getVoteRemainingBlocks(
+    { ...vote.data, ...state },
+    currentBlockNumber
+  )
 
-  // Delayed
-  if (endBlock <= currentBlockNumber && currentBlockNumber < executionBlock) {
-    const remainingBlocks = executionBlock - currentBlockNumber
-    return {
-      delayed: true,
-      closed: true,
-      remainingBlocks,
-      transitionAt: new Date(now + remainingBlocks * blockTimeMiliseconds),
-    }
-  }
-  return { closed: true }
+  // Save the end time for the next state transition
+  state.transitionAt = new Date(
+    currentBlockTimestamp + remainingBlocks * blockTimeMiliseconds
+  )
+
+  return state
 }
 
 export const getQuorumProgress = ({ numData: { yea, votingPower } }) =>

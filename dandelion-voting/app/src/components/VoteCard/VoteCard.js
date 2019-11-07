@@ -120,15 +120,19 @@ const VoteCard = ({ vote, onOpen }) => {
         `}
       >
         {!closed || (delayed && getVoteSuccess(vote, pctBase)) ? (
-          <div
-            css={`
-              display: flex;
-              justify-content: space-between;
-            `}
-          >
-            <Timer end={transitionAt} maxUnits={4} />
-            <BlockTimerHelper vote={vote} />
-          </div>
+          transitionAt ? (
+            <div
+              css={`
+                display: flex;
+                justify-content: space-between;
+              `}
+            >
+              <Timer end={transitionAt} maxUnits={4} />
+              <BlockTimerHelper vote={vote} />
+            </div>
+          ) : (
+            <TimerPlaceholder />
+          )
         ) : (
           <VoteStatus vote={vote} />
         )}
@@ -146,6 +150,13 @@ const WrapVoteOption = styled.span`
   align-items: center;
   text-transform: uppercase;
   ${textStyle('label2')};
+`
+
+const TimerPlaceholder = styled.div`
+  background: #f1f3f7;
+  height: 20px;
+  width: 40%;
+  border-radius: 6px;
 `
 
 export default VoteCard
