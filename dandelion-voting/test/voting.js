@@ -43,6 +43,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
         // Voting errors
         DANDELION_VOTING_NO_VOTE: "DANDELION_VOTING_NO_VOTE",
+        DANDELION_VOTING_VOTE_ID_ZERO: "DANDELION_VOTING_VOTE_ID_ZERO",
         DANDELION_VOTING_INIT_PCTS: "DANDELION_VOTING_INIT_PCTS",
         DANDELION_VOTING_CHANGE_SUPPORT_PCTS: "DANDELION_VOTING_CHANGE_SUPPORT_PCTS",
         DANDELION_VOTING_CHANGE_QUORUM_PCTS: "DANDELION_VOTING_CHANGE_QUORUM_PCTS",
@@ -248,6 +249,10 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
                 it('fails getting a vote out of bounds', async () => {
                     await assertRevert(voting.getVote(voteId + 1), errors.DANDELION_VOTING_NO_VOTE)
+                })
+
+                it('fails getting a vote with id 0', async () => {
+                    await assertRevert(voting.getVote(0), errors.DANDELION_VOTING_VOTE_ID_ZERO)
                 })
 
                 it('changing required support does not affect vote required support', async () => {
@@ -528,7 +533,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     it('returns false when voted yea and vote finished, failed and before execution delay passed', async () => {
                         await voting.vote(voteId, true, { from: holder20 })
                         await voting.vote(voteId, false, { from: holder29 })
-                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks - 3)
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks - 4)
 
                         assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder20]))
                     })
@@ -541,7 +546,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                         assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
                     })
 
-                    it('returns false when voted yea and vote finished but not executed', async () => {
+                    it('returns false when voted yea and vote finished but not executed and before execution period passed', async () => {
                         await voting.vote(voteId, true, { from: holder29 })
                         await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
 

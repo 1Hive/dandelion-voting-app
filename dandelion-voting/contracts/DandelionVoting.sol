@@ -257,16 +257,17 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
         require(_how.length > 0, ERROR_ORACLE_SENDER_MISSING);
         require(_how[0] < 2**160, ERROR_ORACLE_SENDER_TOO_BIG);
         require(_how[0] != 0, ERROR_ORACLE_SENDER_ZERO);
-        address sender = address(_how[0]);
 
+        address sender = address(_how[0]);
         uint256 senderLatestYeaVoteId = latestYeaVoteId[sender];
         Vote storage senderLatestYeaVote_ = votes[senderLatestYeaVoteId];
+        uint64 blockNumber = getBlockNumber64();
 
         bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote_);
-        bool senderLatestYeaVoteExecutionBlockPassed = getBlockNumber64() > senderLatestYeaVote_.executionBlock;
+        bool senderLatestYeaVoteExecutionBlockPassed = blockNumber >= senderLatestYeaVote_.executionBlock;
 
         uint64 fallbackPeriodLength = bufferBlocks / EXECUTION_PERIOD_FALLBACK_DIVISOR;
-        bool senderLatestYeaVoteFallbackPeriodPassed = getBlockNumber64() > senderLatestYeaVote_.executionBlock.add(fallbackPeriodLength);
+        bool senderLatestYeaVoteFallbackPeriodPassed = blockNumber > senderLatestYeaVote_.executionBlock.add(fallbackPeriodLength);
 
         return senderLatestYeaVoteFailed && senderLatestYeaVoteExecutionBlockPassed || senderLatestYeaVote_.executed || senderLatestYeaVoteFallbackPeriodPassed;
     }
@@ -462,7 +463,8 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
         uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
-        return votingPowerAtSnapshot > 0 && getBlockNumber64() >= vote_.startBlock && getBlockNumber64() < vote_.startBlock.add(durationBlocks);
+        uint64 blockNumber = getBlockNumber64();
+        return votingPowerAtSnapshot > 0 && blockNumber >= vote_.startBlock && blockNumber < vote_.startBlock.add(durationBlocks);
     }
 
     /**
