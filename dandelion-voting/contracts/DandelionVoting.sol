@@ -25,6 +25,7 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     bytes32 public constant MODIFY_EXECUTION_DELAY_ROLE = keccak256("MODIFY_EXECUTION_DELAY_ROLE");
 
     uint64 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10^16; 100% = 10^18
+    uint8 private constant EXECUTION_PERIOD_FALLBACK_DIVISOR = 2;
 
     string private constant ERROR_VOTE_ID_ZERO = "DANDELION_VOTING_VOTE_ID_ZERO";
     string private constant ERROR_NO_VOTE = "DANDELION_VOTING_NO_VOTE";
@@ -260,11 +261,14 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
 
         uint256 senderLatestYeaVoteId = latestYeaVoteId[sender];
         Vote storage senderLatestYeaVote_ = votes[senderLatestYeaVoteId];
-        bool senderLatestYeaVoteFinished = getBlockNumber64() > senderLatestYeaVote_.startBlock.add(durationBlocks);
-        bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote_);
-        bool senderLatestYeaVoteExecutionPeriodPassed = getBlockNumber64() > senderLatestYeaVote_.executionBlock.add(bufferBlocks.div(2));
 
-        return senderLatestYeaVoteFinished && senderLatestYeaVoteFailed || senderLatestYeaVote_.executed || senderLatestYeaVoteExecutionPeriodPassed;
+        bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote_);
+        bool senderLatestYeaVoteExecutionBlockPassed = getBlockNumber64() > senderLatestYeaVote_.executionBlock;
+
+        uint64 fallbackPeriodLength = bufferBlocks / EXECUTION_PERIOD_FALLBACK_DIVISOR;
+        bool senderLatestYeaVoteFallbackPeriodPassed = getBlockNumber64() > senderLatestYeaVote_.executionBlock.add(fallbackPeriodLength);
+
+        return senderLatestYeaVoteFailed && senderLatestYeaVoteExecutionBlockPassed || senderLatestYeaVote_.executed || senderLatestYeaVoteFallbackPeriodPassed;
     }
 
     // Getter fns

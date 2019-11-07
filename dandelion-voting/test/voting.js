@@ -165,8 +165,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
     })
 
-    for (const decimals of [0]) {
-    // for (const decimals of [0, 2, 18, 26]) {
+    for (const decimals of [0, 2, 18, 26]) {
         context(`normal token supply, ${decimals} decimals`, () => {
             const neededSupport = pct16(50)
             const minimumAcceptanceQuorum = pct16(20)
@@ -518,12 +517,20 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                         assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
                     })
 
-                    it('returns true when voted yea and vote finished but failed', async () => {
+                    it('returns true when voted yea and vote finished, failed and execution delay passed', async () => {
                         await voting.vote(voteId, true, { from: holder20 })
                         await voting.vote(voteId, false, { from: holder29 })
-                        await voting.mockAdvanceBlocks(durationBlocks)
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
 
                         assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder20]))
+                    })
+
+                    it('returns false when voted yea and vote finished, failed and before execution delay passed', async () => {
+                        await voting.vote(voteId, true, { from: holder20 })
+                        await voting.vote(voteId, false, { from: holder29 })
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks - 3)
+
+                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder20]))
                     })
 
                     it('returns true when voted yea and vote finished and executed', async () => {
