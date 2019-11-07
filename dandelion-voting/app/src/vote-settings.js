@@ -1,6 +1,6 @@
 const voteSettings = [
   ['token', 'tokenAddress'],
-  ['voteTime', 'voteTime', 'time'],
+  ['voteDurationBlocks', 'voteDurationBlocks', 'bignumber'],
   ['PCT_BASE', 'pctBase', 'bignumber'],
 ]
 

@@ -4,16 +4,18 @@ import { useCurrentApp } from '@aragon/api-react'
 import { useSettings } from '../vote-settings-manager'
 import {
   VOTE_STATUS_ONGOING,
+  VOTE_STATUS_UPCOMING,
   VOTE_STATUS_REJECTED,
   VOTE_STATUS_ACCEPTED,
   VOTE_STATUS_PENDING_ENACTMENT,
-  VOTE_STATUS_ENACTED,
+  VOTE_STATUS_ENACTED
 } from '../vote-types'
 import { getVoteStatus } from '../vote-utils'
 
 const NULL_FILTER_STATE = -1
 const STATUS_FILTER_OPEN = 1
-const STATUS_FILTER_CLOSED = 2
+const STATUS_FILTER_UPCOMING = 2
+const STATUS_FILTER_CLOSED = 3
 const TREND_FILTER_WILL_PASS = 1
 const TREND_FILTER_WILL_NOT_PASS = 2
 const OUTCOME_FILTER_PASSED = 1
@@ -26,7 +28,11 @@ function testStatusFilter(filter, voteStatus) {
   return (
     filter === NULL_FILTER_STATE ||
     (filter === STATUS_FILTER_OPEN && voteStatus === VOTE_STATUS_ONGOING) ||
-    (filter === STATUS_FILTER_CLOSED && voteStatus !== VOTE_STATUS_ONGOING)
+    (filter === STATUS_FILTER_UPCOMING &&
+      voteStatus === VOTE_STATUS_UPCOMING) ||
+    (filter === STATUS_FILTER_CLOSED &&
+      voteStatus !== VOTE_STATUS_ONGOING &&
+      voteStatus !== VOTE_STATUS_UPCOMING)
   )
 }
 
@@ -101,7 +107,7 @@ const useFilterVotes = (votes, executionTargets) => {
   // Date range
   const [dateRangeFilter, setDateRangeFilter] = useState({
     start: null,
-    end: null,
+    end: null
   })
 
   const handleClearFilters = useCallback(() => {
@@ -115,7 +121,7 @@ const useFilterVotes = (votes, executionTargets) => {
     setTrendFilter,
     setOutcomeFilter,
     setAppFilter,
-    setDateRangeFilter,
+    setDateRangeFilter
   ])
 
   useEffect(() => {
@@ -128,7 +134,7 @@ const useFilterVotes = (votes, executionTargets) => {
         testOutcomeFilter(outcomeFilter, voteStatus) &&
         testAppFilter(appFilter, vote, {
           apps: executionTargets,
-          thisAddress: appAddress,
+          thisAddress: appAddress
         }) &&
         testDateRangeFilter(dateRangeFilter, vote)
       )
@@ -144,7 +150,7 @@ const useFilterVotes = (votes, executionTargets) => {
     pctBase,
     setFilteredVotes,
     votes,
-    executionTargets,
+    executionTargets
   ])
 
   return {
@@ -174,7 +180,7 @@ const useFilterVotes = (votes, executionTargets) => {
     ),
     voteDateRangeFilter: dateRangeFilter,
     handleVoteDateRangeFilterChange: setDateRangeFilter,
-    handleClearFilters,
+    handleClearFilters
   }
 }
 

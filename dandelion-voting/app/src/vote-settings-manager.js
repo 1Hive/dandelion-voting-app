@@ -6,15 +6,15 @@ import BN from 'bn.js'
 
 const SettingsContext = React.createContext({
   pctBase: new BN(-1),
-  voteTime: -1,
+  voteDurationBlocks: -1
 })
 
 export const useSettings = () => useContext(SettingsContext)
 
 export function SettingsProvider({ children }) {
-  const { pctBase, voteTime } = useAppState()
+  const { pctBase, voteDurationBlocks } = useAppState()
   return (
-    <SettingsContext.Provider value={{ pctBase, voteTime }}>
+    <SettingsContext.Provider value={{ pctBase, voteDurationBlocks }}>
       {children}
     </SettingsContext.Provider>
   )

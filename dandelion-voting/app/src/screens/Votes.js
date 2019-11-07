@@ -14,16 +14,19 @@ import VoteCard from '../components/VoteCard/VoteCard'
 import VoteCardGroup from '../components/VoteCard/VoteCardGroup'
 
 const sortVotes = (a, b) => {
-  const dateDiff = b.data.endDate - a.data.endDate
-  // Order by descending voteId if there's no end date difference
+  const dateDiff = b.data.endBlock - a.data.endBlock
+  // Order by descending voteId if there's no end block difference
   return dateDiff !== 0 ? dateDiff : b.voteId - a.voteId
 }
 
 const useVotes = votes => {
   const sortedVotes = votes.sort(sortVotes)
   const openVotes = sortedVotes.filter(vote => vote.data.open)
-  const closedVotes = sortedVotes.filter(vote => !openVotes.includes(vote))
-  return { openVotes, closedVotes }
+  const upcomingVotes = sortedVotes.filter(vote => vote.data.upcoming)
+  const closedVotes = sortedVotes.filter(
+    vote => !upcomingVotes.includes(vote) && !openVotes.includes(vote)
+  )
+  return { openVotes, upcomingVotes, closedVotes }
 }
 
 const Votes = React.memo(function Votes({
@@ -45,7 +48,7 @@ const Votes = React.memo(function Votes({
 }) {
   const theme = useTheme()
   const { layoutName } = useLayout()
-  const { openVotes, closedVotes } = useVotes(filteredVotes)
+  const { openVotes, upcomingVotes, closedVotes } = useVotes(filteredVotes)
 
   const multipleOfTarget = executionTargets.reduce((map, { name }) => {
     map.set(name, map.has(name))
@@ -88,6 +91,7 @@ const Votes = React.memo(function Votes({
                   </span>
                 </div>,
                 'Open',
+                'Upcoming',
                 'Closed',
               ]}
               width="128px"
@@ -140,15 +144,19 @@ const Votes = React.memo(function Votes({
           </div>
         </Bar>
       )}
-      {!filteredVotes.length ? (
-        <EmptyFilteredVotes onClear={handleClearFilters} />
-      ) : (
-        <VoteGroups
-          openVotes={openVotes}
-          closedVotes={closedVotes}
-          onSelectVote={selectVote}
-        />
-      )}
+
+      <React.Fragment>
+        {!filteredVotes.length ? (
+          <EmptyFilteredVotes onClear={handleClearFilters} />
+        ) : (
+          <VoteGroups
+            openVotes={openVotes}
+            upcomingVotes={upcomingVotes}
+            closedVotes={closedVotes}
+            onSelectVote={selectVote}
+          />
+        )}
+      </React.Fragment>
     </React.Fragment>
   )
 })
@@ -174,22 +182,32 @@ const ThisVoting = ({ showTag }) => (
   </div>
 )
 
-const VoteGroups = React.memo(({ openVotes, closedVotes, onSelectVote }) => {
-  const voteGroups = [['Open votes', openVotes], ['Closed votes', closedVotes]]
+const VoteGroups = React.memo(
+  ({ openVotes, upcomingVotes, closedVotes, onSelectVote }) => {
+    const voteGroups = [
+      ['Open votes', openVotes],
+      ['Upcoming votes', upcomingVotes],
+      ['Closed votes', closedVotes],
+    ]
 
-  return (
-    <React.Fragment>
-      {voteGroups.map(([groupName, votes]) =>
-        votes.length ? (
-          <VoteCardGroup title={groupName} count={votes.length} key={groupName}>
-            {votes.map(vote => (
-              <VoteCard key={vote.voteId} vote={vote} onOpen={onSelectVote} />
-            ))}
-          </VoteCardGroup>
-        ) : null
-      )}
-    </React.Fragment>
-  )
-})
+    return (
+      <React.Fragment>
+        {voteGroups.map(([groupName, votes]) =>
+          votes.length ? (
+            <VoteCardGroup
+              title={groupName}
+              count={votes.length}
+              key={groupName}
+            >
+              {votes.map(vote => (
+                <VoteCard key={vote.voteId} vote={vote} onOpen={onSelectVote} />
+              ))}
+            </VoteCardGroup>
+          ) : null
+        )}
+      </React.Fragment>
+    )
+  }
+)
 
 export default Votes

@@ -28,3 +28,26 @@ export function addressesEqual(first, second) {
   second = second && second.toLowerCase()
   return first === second
 }
+
+/**
+ * @param {*} api aragon api
+ * @returns {object} Latest block number and timestamp in miliseconds
+ */
+export const loadLatestBlock = async api => {
+  const { number, timestamp } = await api
+    .web3Eth('getBlock', 'latest')
+    .toPromise()
+
+  return { number, timestamp: timestamp * 1000 }
+}
+
+/**
+ * @param {object} api aragon api
+ * @param {number} blockNumber  block number
+ * @returns {number} timestamp of the #blockNumber block in miliseconds
+ */
+export const loadBlockTimestamp = async (api, blockNumber) => {
+  const { timestamp } = await api.web3Eth('getBlock', blockNumber).toPromise()
+  // Adjust for solidity time (s => ms)
+  return timestamp * 1000
+}

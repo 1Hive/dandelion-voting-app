@@ -39,7 +39,7 @@ export function useCreateVoteAction(onDone = noop) {
     question => {
       if (api) {
         // Don't care about response
-        api.newVote(EMPTY_CALLSCRIPT, question).toPromise()
+        api.newVote(EMPTY_CALLSCRIPT, question, true).toPromise()
         onDone()
       }
     },
@@ -51,9 +51,9 @@ export function useCreateVoteAction(onDone = noop) {
 export function useVoteAction(onDone = noop) {
   const api = useApi()
   return useCallback(
-    (voteId, voteType, executesIfDecided = true) => {
+    (voteId, voteType) => {
       // Don't care about response
-      api.vote(voteId, voteType === VOTE_YEA, executesIfDecided).toPromise()
+      api.vote(voteId, voteType === VOTE_YEA).toPromise()
       onDone()
     },
     [api, onDone]
@@ -76,8 +76,7 @@ export function useExecuteAction(onDone = noop) {
 // Handles the main logic of the app.
 export function useAppLogic() {
   const { isSyncing, ready } = useAppState()
-
-  const [votes, executionTargets] = useVotes()
+  const [votes, executionTargets, blockHasLoaded] = useVotes()
   const [selectedVote, selectVote] = useSelectedVote(votes)
   const newVotePanel = usePanelState()
 
@@ -93,7 +92,7 @@ export function useAppLogic() {
     selectVote,
     selectedVote,
     votes,
-    isSyncing: isSyncing || !ready,
+    isSyncing: isSyncing || !ready || !blockHasLoaded,
     newVotePanel: useMemo(() => newVotePanel, [newVotePanel]),
   }
 }

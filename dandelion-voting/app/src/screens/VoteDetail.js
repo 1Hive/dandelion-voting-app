@@ -25,9 +25,11 @@ import VoteStatus from '../components/VoteStatus'
 import VoteText from '../components/VoteText'
 import VoteCasted from '../components/VoteCasted'
 import { percentageList, round, safeDiv } from '../math-utils'
-import { getQuorumProgress } from '../vote-utils'
+import { getQuorumProgress, getVoteSuccess } from '../vote-utils'
 import { VOTE_NAY, VOTE_YEA } from '../vote-types'
 import { addressesEqual } from '../web3-utils'
+import { useBlockTimeStamp } from '../hooks/useBlock'
+import { useSettings } from '../vote-settings-manager'
 
 const formatDate = date => `${format(date, 'do MMM yy, HH:mm')} UTC`
 
@@ -261,9 +263,21 @@ function VoteDetail({ vote, onBack, onVote, onExecute }) {
 function Status({ vote }) {
   const theme = useTheme()
   const network = useNetwork()
-  const { endDate, executionDate, executionTransaction, open } = vote.data
+  const { pctBase } = useSettings()
+  const {
+    executionDate,
+    executionTransaction,
+    upcoming,
+    open,
+    delayed,
+    closed,
+    transitionAt,
+    endBlock,
+  } = vote.data
 
-  if (open) {
+  const endBlockTimeStamp = useBlockTimeStamp(endBlock, closed)
+
+  if (!closed || (delayed && getVoteSuccess(vote, pctBase))) {
     return (
       <React.Fragment>
         <div
@@ -273,13 +287,18 @@ function Status({ vote }) {
             margin-bottom: ${1 * GU}px;
           `}
         >
-          Time remaining
+          {upcoming
+            ? `Time to start `
+            : open
+            ? ` Time remaining`
+            : `Time for enactment`}
         </div>
-        <Timer end={endDate} maxUnits={4} />
+        {<Timer end={transitionAt} maxUnits={4} />}
       </React.Fragment>
     )
   }
 
+  const dateHasLoaded = executionDate || endBlockTimeStamp
   return (
     <React.Fragment>
       <VoteStatus vote={vote} />
@@ -294,7 +313,19 @@ function Status({ vote }) {
           ${textStyle('body2')};
         `}
       >
-        <IconTime size="small" /> {formatDate(executionDate || endDate)}
+        <IconTime size="small" />{' '}
+        {dateHasLoaded ? (
+          formatDate(executionDate || new Date(endBlockTimeStamp))
+        ) : (
+          <div
+            css={`
+              height: 25px;
+              width: 150px;
+              background: #f9fafc;
+              border-radius: 6px;
+            `}
+          />
+        )}
       </div>
       {executionTransaction && (
         <div>

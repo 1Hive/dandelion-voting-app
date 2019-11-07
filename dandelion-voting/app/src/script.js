@@ -180,6 +180,7 @@ async function castVote(state, { voteId, voter }) {
   }
 
   const transform = async vote => ({
+    ...state,
     ...vote,
     data: {
       ...vote.data,
@@ -187,7 +188,14 @@ async function castVote(state, { voteId, voter }) {
     },
   })
 
-  return updateState({ ...state, connectedAccountVotes }, voteId, transform)
+  return updateState(
+    {
+      ...state,
+      connectedAccountVotes,
+    },
+    voteId,
+    transform
+  )
 }
 
 async function executeVote(
@@ -294,14 +302,12 @@ async function loadVoterState({ connectedAccount, voteId }) {
 async function loadVoteDescription(vote) {
   vote.description = ''
   vote.executionTargets = []
-
   if (!vote.script || vote.script === EMPTY_CALLSCRIPT) {
     return vote
   }
 
   try {
     const path = await app.describeScript(vote.script).toPromise()
-
     // Get unique list of targets
     vote.executionTargets = [...new Set(path.map(({ to }) => to))]
     vote.description = path
@@ -369,7 +375,8 @@ function marshallVote({
   minAcceptQuorum,
   nay,
   snapshotBlock,
-  startDate,
+  startBlock,
+  executionBlock,
   supportRequired,
   votingPower,
   yea,
@@ -385,7 +392,8 @@ function marshallVote({
     yea,
     // Like times, blocks should be safe to represent as real numbers
     snapshotBlock: parseInt(snapshotBlock, 10),
-    startDate: marshallDate(startDate),
+    startBlock: parseInt(startBlock, 10),
+    executionBlock: parseInt(executionBlock, 10),
   }
 }
 

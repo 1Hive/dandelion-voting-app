@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import {
   Button,
@@ -22,11 +22,9 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
   const theme = useTheme()
   const connectedAccount = useConnectedAccount()
   const { tokenSymbol } = useAppState()
-  const [changeVote, setChangeVote] = useState(false)
-  const handleChangeVote = useCallback(() => setChangeVote(true), [])
 
   const { connectedAccountVote, data } = vote
-  const { snapshotBlock, startDate, open } = data
+  const { snapshotBlock, open, delayed } = data
   const {
     canUserVote,
     canExecute,
@@ -36,7 +34,9 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
     userBalancePromise,
     userBalanceNowPromise,
     canExecutePromise,
+    startTimestamp,
   } = useExtendedVoteData(vote)
+
   const hasVoted = [VOTE_YEA, VOTE_NAY].includes(connectedAccountVote)
 
   useEffect(() => {
@@ -73,7 +73,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
   if (!open) {
     return (
       <React.Fragment>
-        {canExecute && isVoteAction(vote) && (
+        {canExecute && !delayed && isVoteAction(vote) && (
           <React.Fragment>
             <Button mode="strong" onClick={onExecute} wide>
               Enact this vote
@@ -89,27 +89,6 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
     )
   }
 
-  if (canUserVote && hasVoted && !changeVote) {
-    return (
-      <div>
-        <Button
-          mode="strong"
-          onClick={handleChangeVote}
-          wide
-          css={`
-            margin-bottom: ${2 * GU}px;
-          `}
-        >
-          Change my vote
-        </Button>
-        <Info>
-          While the voting period is open, you can{' '}
-          <strong>change your vote</strong> as many times as you wish.
-        </Info>
-      </div>
-    )
-  }
-
   if (canUserVote) {
     return (
       <div>
@@ -118,7 +97,7 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
             <Buttons onClickYes={onVoteYes} onClickNo={onVoteNo} />
             <TokenReference
               snapshotBlock={snapshotBlock}
-              startDate={startDate}
+              startDate={new Date(startTimestamp)}
               tokenSymbol={tokenSymbol}
               userBalance={userBalance}
               userBalanceNow={userBalanceNow}
@@ -167,6 +146,17 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
     )
   }
 
+  if (hasVoted) {
+    return (
+      <div>
+        <Buttons disabled />
+        <Info mode="warning">
+          You have already voted and changing vote is not allowed.
+        </Info>
+      </div>
+    )
+  }
+
   return (
     <div>
       <Buttons disabled />
@@ -175,9 +165,10 @@ const VoteActions = React.memo(({ vote, onVoteYes, onVoteNo, onExecute }) => {
           ? 'Although the currently connected account holds tokens, it'
           : 'The currently connected account'}{' '}
         did not hold any <strong>{tokenSymbol}</strong> tokens when this vote
-        began ({formatDate(startDate)}) and therefore cannot participate in this
-        vote. Make sure your accounts are holding <strong>{tokenSymbol}</strong>{' '}
-        at the time a vote begins if you'd like to vote using this Voting app.
+        began ({formatDate(new Date(startTimestamp))}) and therefore cannot
+        participate in this vote. Make sure your accounts are holding{' '}
+        <strong>{tokenSymbol}</strong> at the time a vote begins if you'd like
+        to vote using this Voting app.
       </Info>
     </div>
   )

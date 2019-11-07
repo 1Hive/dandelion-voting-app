@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { useAppState, useCurrentApp, useInstalledApps } from '@aragon/api-react'
-import { isVoteOpen } from '../vote-utils'
+import { getVoteTransition } from '../vote-utils'
 import { VOTE_ABSENT } from '../vote-types'
 import { EMPTY_ADDRESS } from '../web3-utils'
-import useNow from './useNow'
+import { useBlockTime, useLatestBlock } from './useBlock'
 
 // Temporary fix to make sure executionTargets always returns an array, until
 // we find out the reason why it can sometimes be missing in the cached data.
@@ -91,21 +91,26 @@ function useDecoratedVotes() {
 // Get the votes array ready to be used in the app.
 export default function useVotes() {
   const [votes, executionTargets] = useDecoratedVotes()
-  const now = useNow()
+  const latestBlock = useLatestBlock()
+  const blockTime = useBlockTime()
 
-  const openedStates = votes.map(v => isVoteOpen(v, now))
-  const openedStatesKey = openedStates.join('')
+  const voteStates = useMemo(
+    () => votes.map(v => getVoteTransition(v, latestBlock, blockTime)),
+    [blockTime, latestBlock, votes]
+  )
 
+  const voteStatesKeys = voteStates.map(v => Object.keys(v).join('')).join('')
   return [
     useMemo(() => {
       return votes.map((vote, i) => ({
         ...vote,
         data: {
           ...vote.data,
-          open: openedStates[i],
+          ...voteStates[i],
         },
       }))
-    }, [votes, openedStatesKey]), // eslint-disable-line react-hooks/exhaustive-deps
+    }, [votes, voteStatesKeys]), // eslint-disable-line react-hooks/exhaustive-deps
     executionTargets,
+    latestBlock.number !== 0,
   ]
 }

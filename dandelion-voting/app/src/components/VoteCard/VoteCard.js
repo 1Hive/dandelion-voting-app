@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react'
 import styled from 'styled-components'
-import { Card, GU, IconCheck, Timer, textStyle, useTheme } from '@aragon/ui'
+import { Card, GU, IconCheck, textStyle, useTheme, Timer } from '@aragon/ui'
 import { noop } from '../../utils'
 import { VOTE_YEA, VOTE_NAY } from '../../vote-types'
 import LocalLabelAppBadge from '..//LocalIdentityBadge/LocalLabelAppBadge'
@@ -8,9 +8,14 @@ import VoteOptions from './VoteOptions'
 import VoteStatus from '../VoteStatus'
 import VoteText from '../VoteText'
 import You from '../You'
+import BlockTimerHelper from '../BlockTimerHelper'
+import { getVoteSuccess } from '../../vote-utils'
+import { useSettings } from '../../vote-settings-manager'
 
 const VoteCard = ({ vote, onOpen }) => {
   const theme = useTheme()
+  const { pctBase } = useSettings()
+
   const {
     connectedAccountVote,
     data,
@@ -19,7 +24,8 @@ const VoteCard = ({ vote, onOpen }) => {
     voteId,
   } = vote
   const { votingPower, yea, nay } = numData
-  const { open, metadata, description, endDate } = data
+  const { metadata, description, delayed, closed, transitionAt } = data
+
   const options = useMemo(
     () => [
       {
@@ -113,8 +119,20 @@ const VoteCard = ({ vote, onOpen }) => {
           margin-top: ${2 * GU}px;
         `}
       >
-        {open ? (
-          <Timer end={endDate} maxUnits={4} />
+        {!closed || (delayed && getVoteSuccess(vote, pctBase)) ? (
+          transitionAt ? (
+            <div
+              css={`
+                display: flex;
+                justify-content: space-between;
+              `}
+            >
+              <Timer end={transitionAt} maxUnits={4} />
+              <BlockTimerHelper vote={vote} />
+            </div>
+          ) : (
+            <TimerPlaceholder />
+          )
         ) : (
           <VoteStatus vote={vote} />
         )}
@@ -132,6 +150,13 @@ const WrapVoteOption = styled.span`
   align-items: center;
   text-transform: uppercase;
   ${textStyle('label2')};
+`
+
+const TimerPlaceholder = styled.div`
+  background: #f1f3f7;
+  height: 20px;
+  width: 40%;
+  border-radius: 6px;
 `
 
 export default VoteCard

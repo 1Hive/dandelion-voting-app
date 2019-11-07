@@ -14,14 +14,30 @@ import {
   VOTE_STATUS_REJECTED,
   VOTE_STATUS_ACCEPTED,
   VOTE_STATUS_ENACTED,
+  VOTE_STATUS_UPCOMING,
   VOTE_STATUS_PENDING_ENACTMENT,
+  VOTE_STATUS_DELAYED,
 } from '../vote-types'
 import { getVoteStatus } from '../vote-utils'
 
 const getStatusAttributes = (status, theme) => {
+  if (status === VOTE_STATUS_UPCOMING) {
+    return {
+      label: 'Upcoming',
+      Icon: IconTime,
+      color: null,
+    }
+  }
   if (status === VOTE_STATUS_ONGOING) {
     return {
       label: 'Ongoing',
+      Icon: IconTime,
+      color: null,
+    }
+  }
+  if (status === VOTE_STATUS_DELAYED) {
+    return {
+      label: 'Delayed',
       Icon: IconTime,
       color: null,
     }
