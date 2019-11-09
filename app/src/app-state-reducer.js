@@ -11,7 +11,7 @@ function appStateReducer(state) {
   const {
     pctBase,
     tokenDecimals,
-    voteDurationBlocks,
+    durationBlocks,
     votes,
     connectedAccountVotes,
   } = state
@@ -42,7 +42,7 @@ function appStateReducer(state) {
             ...vote,
             data: {
               ...data,
-              endBlock: data.startBlock + parseInt(voteDurationBlocks, 10),
+              endBlock: data.startBlock + parseInt(durationBlocks, 10),
               executionBlock: data.executionBlock,
               executionDate: data.executionDate && new Date(data.executionDate),
               minAcceptQuorum: new BN(data.minAcceptQuorum),

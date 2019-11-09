@@ -2,9 +2,9 @@
   "name": "@1hive/apps-dandelion-voting",
   "version": "1.0.0",
   "scripts": {
-    "start": "aragon run",
+    "start": "aragon run --block-time 3",
     "start:template": "npm run start -- --template Template --template-init @ARAGON_ENS --files dist",
-    "start:http": "aragon run --http localhost:8001 --http-served-from ./dist",
+    "start:http": "aragon run --http localhost:8001 --http-served-from ./dist --block-time 3",
     "start:http:template": "npm run start:http -- --template Template --template-init @ARAGON_ENS",
     "build": "cd app && npm run build && cd ..",
     "prepare": "cd app && npm install && cd ..",
