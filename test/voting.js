@@ -230,7 +230,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 })
 
                 it('has correct state', async () => {
-                    const [isOpen, isExecuted, startBlock, executionBlock, snapshotBlock, supportRequired, minQuorum, y, n, execScript] = await voting.getVote(voteId)
+                    const [isOpen, isExecuted, startBlock, executionBlock, snapshotBlock, supportRequired, minQuorum, votingPower, y, n, execScript] = await voting.getVote(voteId)
 
                     assert.isTrue(isOpen, 'vote should be open')
                     assert.isFalse(isExecuted, 'vote should not be executed')
@@ -240,6 +240,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     assert.equal(snapshotBlock.toString(), await getBlockNumber() - 1, 'snapshot block should be correct')
                     assert.equal(supportRequired.toString(), neededSupport.toString(), 'required support should be app required support')
                     assert.equal(minQuorum.toString(), minimumAcceptanceQuorum.toString(), 'min quorum should be app min quorum')
+                    assert.equal(votingPower.toString(), bigExp(100, decimals), 'voting power should be 100')
                     assert.equal(y, 0, 'initial yea should be 0')
                     assert.equal(n, 0, 'initial nay should be 0')
                     assert.equal(execScript, script, 'script should be correct')
@@ -304,7 +305,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     const state = await voting.getVote(voteId)
                     const voterState = await voting.getVoterState(voteId, holder29)
 
-                    assert.equal(state[8].toString(), bigExp(29, decimals).toString(), 'nay vote should have been counted')
+                    assert.equal(state[9].toString(), bigExp(29, decimals).toString(), 'nay vote should have been counted')
                     assert.equal(voterState, VOTER_STATE.NAY, 'holder29 should have nay voter status')
                 })
 
@@ -315,7 +316,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     const state = await voting.getVote(voteId)
 
                     const currentBalance = await token.balanceOf(holder29)
-                    assert.equal(state[7].toString(), bigExp(29, decimals).toString(), 'snapshot balance should have been added')
+                    assert.equal(state[8].toString(), bigExp(29, decimals).toString(), 'snapshot balance should have been added')
                     assert.equal(currentBalance.toNumber(), bigExp(30, decimals).toNumber(), 'balance should be 30 at current block')
                 })
 
@@ -326,7 +327,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     const state = await voting.getVote(voteId)
 
                     const currentBalance = await token.balanceOf(holder29)
-                    assert.equal(state[7].toString(), bigExp(28, decimals).toString(), 'current balance should have been added')
+                    assert.equal(state[8].toString(), bigExp(28, decimals).toString(), 'current balance should have been added')
                     assert.equal(currentBalance.toNumber(), bigExp(28, decimals).toNumber(), 'balance should be 28 at current block')
                 })
 
