@@ -27,7 +27,6 @@ const App = React.memo(function App() {
     selectedVote,
     selectVote,
     votes,
-    sete,
   } = useAppLogic()
   const { layoutName } = useLayout()
   const compactMode = layoutName === 'small'
