@@ -20,7 +20,7 @@ import "@aragon/apps-token-manager/contracts/TokenManager.sol";
 import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 import "@aragon/os/contracts/common/EtherTokenConstant.sol";
 
-import "./DandelionVoting.sol";
+import "../DandelionVoting.sol";
 
 
 contract TemplateBase is APMNamehash {
