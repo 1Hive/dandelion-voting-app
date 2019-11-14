@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { AragonApi, useApi, useAppState, usePath } from '@aragon/api-react'
 import appStateReducer from './app-state-reducer'
 import { EMPTY_CALLSCRIPT } from './evmscript-utils'
@@ -21,7 +21,6 @@ function voteIdFromPath(path) {
 // Get the vote currently selected, or null otherwise.
 export function useSelectedVote(votes) {
   const [path, requestPath] = usePath()
-  console.log('PATH ', path)
   const { ready } = useAppState()
 
   // The memoized vote currently selected.
