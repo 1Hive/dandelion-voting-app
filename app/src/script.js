@@ -6,6 +6,7 @@ import { voteTypeFromContractEnum } from './vote-utils'
 import { EMPTY_CALLSCRIPT } from './evmscript-utils'
 import tokenDecimalsAbi from './abi/token-decimals.json'
 import tokenSymbolAbi from './abi/token-symbol.json'
+import { ipfsAdd } from './utils/ipfs-helpers'
 
 const tokenAbi = [].concat(tokenDecimalsAbi, tokenSymbolAbi)
 
@@ -75,12 +76,20 @@ retryEvery(() =>
 
 async function initialize(tokenAddr) {
   return app.store(
-    (state, { blockNumber, event, returnValues, transactionHash }) => {
-      const nextState = {
+    async (state, event) => {
+      const {
+        event: eventName,
+        // TODO: implement eventAddress:
+        // address: eventAddress,
+        returnValues,
+        transactionHash,
+        blockNumber,
+      } = event
+      let nextState = {
         ...state,
       }
 
-      switch (event) {
+      switch (eventName) {
         case events.ACCOUNTS_TRIGGER:
           return updateConnectedAccount(nextState, returnValues)
         case events.SYNC_STATUS_SYNCING:
@@ -88,17 +97,27 @@ async function initialize(tokenAddr) {
         case events.SYNC_STATUS_SYNCED:
           return { ...nextState, isSyncing: false }
         case 'CastVote':
-          return castVote(nextState, returnValues)
+          nextState = await castVote(nextState, returnValues)
+          break
         case 'ExecuteVote':
-          return executeVote(nextState, returnValues, {
+          console.log('EXECUTE VOTE')
+          nextState = await executeVote(nextState, returnValues, {
             blockNumber,
             transactionHash,
           })
+          await handleAction(nextState, event)
+          break
         case 'StartVote':
-          return startVote(nextState, returnValues)
+          nextState = await startVote(nextState, returnValues)
+          console.log('START VOTE ')
+          console.log('nexSTATE ', nextState)
+          console.log('event ', event)
+          await handleAction(nextState, event)
+          break
         default:
-          return nextState
+          break
       }
+      return nextState
     },
     { init: initState(tokenAddr) }
   )
@@ -149,6 +168,46 @@ const initState = tokenAddr => async cachedState => {
 
 /***********************
  *                     *
+ *   Action Handler    *
+ *                     *
+ ***********************/
+
+export const handleAction = async (
+  { votes },
+  { blockNumber, returnValues }
+) => {
+  console.log('HANDLE ACTION')
+  console.log('votes ', votes)
+  console.log('Block Nbr ', blockNumber)
+  const { voteId } = returnValues
+  const voteIndex = votes.findIndex(vote => vote.voteId === voteId)
+  if (voteIndex === -1) return
+
+  const { open, executed, canExecute, executionScript } = votes[voteIndex].data
+
+  if (!(open || executed || canExecute)) {
+    const voteDataHash = await ipfsAdd({
+      ...votes[voteIndex].data,
+      source: 'Dandelion Voting',
+    })
+    console.log('voteDataHash ', voteDataHash)
+    app.registerAppMetadata(blockNumber, voteId, voteDataHash)
+    app.updateForwardedAction(voteId, blockNumber, executionScript, 'failed')
+  } else if (executed) {
+    app.updateForwardedAction(voteId, blockNumber, executionScript, 'completed')
+  } else {
+    const voteDataHash = await ipfsAdd({
+      ...votes[voteIndex].data,
+      source: 'Dandelion Voting',
+    })
+    console.log('voteDataHash ', voteDataHash)
+    app.registerAppMetadata(blockNumber, voteId, voteDataHash)
+    app.newForwardedAction(voteId, blockNumber, executionScript)
+  }
+}
+
+/***********************
+ *                     *
  *   Event Handlers    *
  *                     *
  ***********************/
@@ -160,9 +219,9 @@ async function updateConnectedAccount(state, { account }) {
     // fetch all the votes casted by the connected account
     connectedAccountVotes: state.votes
       ? await getAccountVotes({
-          connectedAccount: account,
-          votes: state.votes,
-        })
+        connectedAccount: account,
+        votes: state.votes,
+      })
       : {},
   }
 }
@@ -312,13 +371,13 @@ async function loadVoteDescription(vote) {
     vote.executionTargets = [...new Set(path.map(({ to }) => to))]
     vote.description = path
       ? path
-          .map(step => {
-            const identifier = step.identifier ? ` (${step.identifier})` : ''
-            const app = step.name ? `${step.name}${identifier}` : `${step.to}`
+        .map(step => {
+          const identifier = step.identifier ? ` (${step.identifier})` : ''
+          const app = step.name ? `${step.name}${identifier}` : `${step.to}`
 
-            return `${app}: ${step.description || 'No description'}`
-          })
-          .join('\n')
+          return `${app}: ${step.description || 'No description'}`
+        })
+        .join('\n')
       : ''
   } catch (error) {
     console.error('Error describing vote script', error)
