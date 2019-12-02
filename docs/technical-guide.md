@@ -667,4 +667,3 @@ Tells wether a vote is open or not
 If you'd like to talk to us about this contract, please reach out to our dev team. The best place to reach us is the #dev channel on [1Hive Keybase chat](https://1hive.org/contribute/keybase).
 
 <br />
-```
