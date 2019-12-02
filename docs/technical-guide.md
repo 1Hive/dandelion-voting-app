@@ -398,6 +398,7 @@ This functions tells if a user canPerform the function that is behind this ACL O
 
 The fallback period is intended to ensure users are both locked in for votes they voted yes on, but still have an opportunity to exit before the next vote that they didn't vote yes on gets executed.
 The idea here is that, the 1/2 buffer duration give other members an opportunity to execute the vote before anyone who voted yes on the proposal has the opportunity to exit.
+It also takes into account the possibility of a vote to fail its execution due to reasons that are outside of the Org's control.
 
 ```
 /**
