@@ -1,5 +1,11 @@
 import React, { useCallback, useMemo } from 'react'
-import { AragonApi, useApi, useAppState, usePath } from '@aragon/api-react'
+import {
+  AragonApi,
+  useApi,
+  useAppState,
+  usePath,
+  useGuiStyle,
+} from '@aragon/api-react'
 import appStateReducer from './app-state-reducer'
 import { EMPTY_CALLSCRIPT } from './evmscript-utils'
 import usePanelState from './hooks/usePanelState'
@@ -119,3 +125,5 @@ export function useAppLogic() {
 export function AppLogicProvider({ children }) {
   return <AragonApi reducer={appStateReducer}>{children}</AragonApi>
 }
+
+export { useGuiStyle }
