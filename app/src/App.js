@@ -14,7 +14,7 @@ import useScrollTop from './hooks/useScrollTop'
 import NoVotes from './screens/NoVotes'
 import VoteDetail from './screens/VoteDetail'
 import Votes from './screens/Votes'
-import { AppLogicProvider, useAppLogic } from './app-logic'
+import { AppLogicProvider, useAppLogic, useGuiStyle } from './app-logic'
 import { IdentityProvider } from './identity-manager'
 import { SettingsProvider } from './vote-settings-manager'
 
@@ -29,6 +29,7 @@ const App = React.memo(function App() {
     votes,
   } = useAppLogic()
   const { layoutName } = useLayout()
+  const { appearance } = useGuiStyle()
   const compactMode = layoutName === 'small'
   const handleBack = useCallback(() => selectVote(-1), [selectVote])
   const {
@@ -49,7 +50,7 @@ const App = React.memo(function App() {
   useScrollTop(selectedVote)
 
   return (
-    <React.Fragment>
+    <Main theme={appearance} assetsUrl="./aragon-ui">
       <SyncIndicator visible={isSyncing} />
       {!votes.length && (
         <div
@@ -111,20 +112,18 @@ const App = React.memo(function App() {
         onCreateVote={actions.createVote}
         panelState={newVotePanel}
       />
-    </React.Fragment>
+    </Main>
   )
 })
 
 export default function Voting() {
   return (
-    <Main assetsUrl="./aragon-ui">
-      <AppLogicProvider>
-        <IdentityProvider>
-          <SettingsProvider>
-            <App />
-          </SettingsProvider>
-        </IdentityProvider>
-      </AppLogicProvider>
-    </Main>
+    <AppLogicProvider>
+      <IdentityProvider>
+        <SettingsProvider>
+          <App />
+        </SettingsProvider>
+      </IdentityProvider>
+    </AppLogicProvider>
   )
 }
