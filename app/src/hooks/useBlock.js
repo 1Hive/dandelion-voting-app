@@ -6,10 +6,10 @@ import useInterval from './useInterval'
 import { loadBlockTimestamp, loadLatestBlock } from '../web3-utils'
 
 const NETWORK_TIMES = new Map([
-  ['main', 13.5],
+  ['main', 13],
   ['kovan', 4],
-  ['rinkeby', 14.5],
-  ['ropsten', 11.5],
+  ['rinkeby', 14],
+  ['ropsten', 11],
   ['goerli', 15],
   ['private', 3],
 ])
