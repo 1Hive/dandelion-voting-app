@@ -1,5 +1,12 @@
 # Dandelion voting <img align="right" src="https://github.com/1Hive/website/blob/master/website/static/img/bee.png" height="80px" />
 
+[![CircleCI](https://circleci.com/gh/1Hive/dandelion-voting-app.svg?style=svg)](https://circleci.com/gh/1Hive/dandelion-voting-app)
+[![Coverage Status](https://coveralls.io/repos/github/1Hive/dandelion-voting-app/badge.svg?branch=master)](https://coveralls.io/github/1Hive/dandelion-voting-app?branch=master)
+
+#### 🐲 Project stage: Mainnet
+
+#### 🚨 Security review status: [Contracts audited](https://diligence.consensys.net/audits/2019/12/dandelion-organizations/)
+
 The Dandelion Voting app is a fork of the Original [Aragon Voting app](https://github.com/aragon/aragon-apps/tree/master/apps/voting).
 It serves the same purpose as the original Voting app but also enables organizations to restrict actions to members who have expressed approval in recent votes. It basically means that by voting yes on a proposal you are committing to a decision in the Org.
 
@@ -13,9 +20,6 @@ The main changes that have been implemented which differ from the original Votin
 - Keep track of the latest vote ids users have voted yes on.
 - Make the app an [ACL Oracle](https://hack.aragon.org/docs/acl_IACLOracle).
 
-#### 🚨 Security Review Status: Contracts frozen for audit as of commit [e5b06df5c6bf3c289ce1abc02b7faa1efb0b65f4](https://github.com/1Hive/dandelion-voting-app/tree/e5b06df5c6bf3c289ce1abc02b7faa1efb0b65f4/contracts)
-
-The code in this repo has not been audited.
 
 ## How does it work?
 
@@ -71,7 +75,7 @@ The interface is pretty much the same as the original Voting app with the except
 
 ### Template
 
-If you would like to see the Dandelion Voting App in action, we recommend the Dandelion Org template available in the Aragon templates directory. Just go to https://preview.1hive.org/, then create a new organization, and choose Dandelion from the template options.
+If you would like to see the Dandelion Voting App in action, we recommend the Dandelion Org template available in the Aragon templates directory. Just go to https://mainnet.aragon.org/, then create a new organization, and choose Dandelion from the template options.
 
 ## How to run the Dandelion Voting app locally
 
@@ -100,13 +104,14 @@ npm run start:template
 ```
 
 ## Aragon DAO Installation
+The Dandelion voting app has been published to APM on Mainnet and Rinkeby at `dandelion-voting.aragonpm.eth`
 
 For a detailed step by step guide you can see [our installation guide](./docs/installation-guide.md)
 
 To deploy to an organization you can use the [aragonCLI](https://hack.aragon.org/docs/cli-intro.html).
 
 ```sh
-aragon dao install <dao-address> dandelion-voting.open.aragonpm.eth --app-init-args <token-address> <supportRequiredPct> <minAcceptQuorumPct> <durationBlocks> <bufferBlocks> <executionDelayBlocks>
+aragon dao install <dao-address> dandelion-voting.aragonpm.eth --app-init-args <token-address> <supportRequiredPct> <minAcceptQuorumPct> <durationBlocks> <bufferBlocks> <executionDelayBlocks>
 ```
 
 ## Contributing
