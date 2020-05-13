@@ -21,4 +21,9 @@ contract VotingMock is DandelionVoting, TimeHelpersMock {
         voteId = _newVote(noScript, _metadata, false);
         emit StartVote(voteId, msg.sender, _metadata);
     }
+
+    // Overwrite function that otherwise requires calling from a TokenManager
+    function onTransfer(address _from, address _to, uint256 _amount) external returns (bool) {
+        return _onTransfer(_from, _to, _amount);
+    }
 }

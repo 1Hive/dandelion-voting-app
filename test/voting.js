@@ -213,7 +213,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             })
 
             it('ACLOracle canPerform() returns true when no votes have been created', async () => {
-                assert.isTrue(await voting.canPerform(holder1, ANY_ADDR, "", []))
+                assert.isTrue(await voting.canPerform(holder1, ANY_ADDR, "", [holder1]))
             })
 
             context('creating vote', () => {
@@ -498,6 +498,102 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                     })
                 })
 
+                const itChecksNoRecentPositiveVotesCorrectly = (functionCallingNoRecentPositiveVotes) => {
+
+                    it('returns true when not voted in any votes', async () => {
+                        assert.isTrue(await functionCallingNoRecentPositiveVotes(holder29))
+                    })
+
+                    it('returns true when voted nay on open vote', async () => {
+                        await voting.vote(voteId, false, { from: holder29 })
+
+                        assert.isTrue(await functionCallingNoRecentPositiveVotes(holder29))
+                    })
+
+                    it('returns true when voted yea and vote finished, failed and execution delay passed', async () => {
+                        await voting.vote(voteId, true, { from: holder20 })
+                        await voting.vote(voteId, false, { from: holder29 })
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
+
+                        assert.isTrue(await functionCallingNoRecentPositiveVotes(holder20))
+                    })
+
+                    it('returns false when voted yea and vote finished, failed and before execution delay passed', async () => {
+                        await voting.vote(voteId, true, { from: holder20 })
+                        await voting.vote(voteId, false, { from: holder29 })
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks - 4)
+
+                        assert.isFalse(await functionCallingNoRecentPositiveVotes(holder20))
+                    })
+
+                    it('returns true when voted yea and vote finished and executed', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
+                        await voting.executeVote(voteId)
+
+                        assert.isTrue(await functionCallingNoRecentPositiveVotes(holder29))
+                    })
+
+                    it('returns false when voted yea and vote finished but not executed and before execution period passed', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
+
+                        assert.isFalse(await functionCallingNoRecentPositiveVotes(holder29))
+                    })
+
+                    it('returns true when voted yea and vote not executed but execution period passed', async() => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks + executionPeriod)
+
+                        assert.isTrue(await functionCallingNoRecentPositiveVotes(holder29))
+                    })
+
+                    it('returns false when voted yea and vote finished, not executed and before execution period passed', async() => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks + executionPeriod - 2)
+
+                        assert.isFalse(await functionCallingNoRecentPositiveVotes(holder29))
+                    })
+
+                    it('returns false when voted yea and vote open', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+
+                        assert.isFalse(await functionCallingNoRecentPositiveVotes(holder29))
+                    })
+
+                    it('returns false when voted nay on first vote and yea on second vote', async () => {
+                        await voting.vote(voteId, false, { from: holder29 })
+                        assert.isTrue(await functionCallingNoRecentPositiveVotes(holder29))
+
+                        voting.mockAdvanceBlocks(bufferBlocks)
+                        const secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false))
+                        await voting.vote(secondVoteId, true, { from: holder29 })
+
+                        assert.isFalse(await functionCallingNoRecentPositiveVotes(holder29))
+                    })
+
+                    it('returns false when voted yea on open vote and new vote created', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        assert.isFalse(await functionCallingNoRecentPositiveVotes(holder29))
+
+                        voting.mockAdvanceBlocks(bufferBlocks)
+                        createdVoteId(await voting.newVote(script, 'metadata', false))
+
+                        assert.isFalse(await functionCallingNoRecentPositiveVotes(holder29))
+                    })
+
+                    it('returns false when voted yea on first vote and nay on second vote', async () => {
+                        await voting.vote(voteId, true, { from: holder29 })
+                        assert.isFalse(await functionCallingNoRecentPositiveVotes(holder29))
+
+                        voting.mockAdvanceBlocks(bufferBlocks)
+                        const secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false))
+                        await voting.vote(secondVoteId, false, { from: holder29 })
+
+                        assert.isFalse(await functionCallingNoRecentPositiveVotes(holder29))
+                    })
+                }
+
                 describe('ACLOracle canPerform()', () => {
 
                     it('reverts when passed empty address array', async () => {
@@ -513,98 +609,14 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                         await assertRevert(voting.canPerform(ANY_ADDR, ANY_ADDR, "", [0]), errors.DANDELION_VOTING_ORACLE_SENDER_ZERO)
                     })
 
-                    it('returns true when not voted in any votes', async () => {
-                        assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-                    })
+                    itChecksNoRecentPositiveVotesCorrectly(
+                        async (sender) => await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [sender]) )
+                })
 
-                    it('returns true when voted nay on open vote', async () => {
-                        await voting.vote(voteId, false, { from: holder29 })
+                describe('TokenManagerHook _transfer()', () => {
 
-                        assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-                    })
-
-                    it('returns true when voted yea and vote finished, failed and execution delay passed', async () => {
-                        await voting.vote(voteId, true, { from: holder20 })
-                        await voting.vote(voteId, false, { from: holder29 })
-                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
-
-                        assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder20]))
-                    })
-
-                    it('returns false when voted yea and vote finished, failed and before execution delay passed', async () => {
-                        await voting.vote(voteId, true, { from: holder20 })
-                        await voting.vote(voteId, false, { from: holder29 })
-                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks - 4)
-
-                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder20]))
-                    })
-
-                    it('returns true when voted yea and vote finished and executed', async () => {
-                        await voting.vote(voteId, true, { from: holder29 })
-                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
-                        await voting.executeVote(voteId)
-
-                        assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-                    })
-
-                    it('returns false when voted yea and vote finished but not executed and before execution period passed', async () => {
-                        await voting.vote(voteId, true, { from: holder29 })
-                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
-
-                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-                    })
-
-                    it('returns true when voted yea and vote not executed but execution period passed', async() => {
-                        await voting.vote(voteId, true, { from: holder29 })
-                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks + executionPeriod)
-
-                        assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-                    })
-
-                    it('returns false when voted yea and vote finished, not executed and before execution period passed', async() => {
-                        await voting.vote(voteId, true, { from: holder29 })
-                        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks + executionPeriod - 2)
-
-                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-                    })
-
-                    it('returns false when voted yea and vote open', async () => {
-                        await voting.vote(voteId, true, { from: holder29 })
-
-                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-                    })
-
-                    it('returns false when voted nay on first vote and yea on second vote', async () => {
-                        await voting.vote(voteId, false, { from: holder29 })
-                        assert.isTrue(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-
-                        voting.mockAdvanceBlocks(bufferBlocks)
-                        const secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false))
-                        await voting.vote(secondVoteId, true, { from: holder29 })
-
-                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-                    })
-
-                    it('returns false when voted yea on open vote and new vote created', async () => {
-                        await voting.vote(voteId, true, { from: holder29 })
-                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-
-                        voting.mockAdvanceBlocks(bufferBlocks)
-                        createdVoteId(await voting.newVote(script, 'metadata', false))
-
-                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-                    })
-
-                    it('returns false when voted yea on first vote and nay on second vote', async () => {
-                        await voting.vote(voteId, true, { from: holder29 })
-                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-
-                        voting.mockAdvanceBlocks(bufferBlocks)
-                        const secondVoteId = createdVoteId(await voting.newVote(script, 'metadata', false))
-                        await voting.vote(secondVoteId, false, { from: holder29 })
-
-                        assert.isFalse(await voting.canPerform(ANY_ADDR, ANY_ADDR, "", [holder29]))
-                    })
+                    itChecksNoRecentPositiveVotesCorrectly(
+                        async (sender) => await voting.onTransfer.call(sender, ANY_ADDR, bigExp(1, 18)) )
                 })
             })
         })
