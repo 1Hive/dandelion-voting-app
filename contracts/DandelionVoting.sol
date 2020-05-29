@@ -14,8 +14,9 @@ import "@aragon/os/contracts/lib/math/SafeMath64.sol";
 import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 import "@1hive/apps-token-manager/contracts/TokenManagerHook.sol";
 
+import "@aragon/apps-agreement/contracts/disputable/DisputableApp.sol";
 
-contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp {
+contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
     using SafeMath for uint256;
     using SafeMath64 for uint64;
 
@@ -41,8 +42,18 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
     string private constant ERROR_ORACLE_SENDER_MISSING = "DANDELION_VOTING_ORACLE_SENDER_MISSING";
     string private constant ERROR_ORACLE_SENDER_TOO_BIG = "DANDELION_VOTING_ORACLE_SENDER_TOO_BIG";
     string private constant ERROR_ORACLE_SENDER_ZERO = "DANDELION_VOTING_ORACLE_SENDER_ZERO";
+    string private constant ERROR_CANNOT_PAUSE_VOTE = "VOTING_CANNOT_PAUSE_VOTE";
+    string private constant ERROR_VOTE_NOT_PAUSED = "VOTING_VOTE_NOT_PAUSED";
 
     enum VoterState { Absent, Yea, Nay }
+
+    enum DisputableStatus {
+        Invalid,                        // A vote created in a previous version that has not been reported to the Agreement
+        Active,                         // A vote that has been reported to the Agreement
+        Paused,                         // A vote that is being challenged
+        Cancelled,                      // A vote that has been cancelled since it was refused after a dispute
+        Closed                          // A vote that has been executed
+    }
 
     struct Vote {
         bool executed;
@@ -55,13 +66,17 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
         uint256 nay;
         bytes executionScript;
         mapping (address => VoterState) voters;
+        uint64 pausedAtBlock;                   // Block when the vote was paused
+        uint64 pauseDurationBlocks;             // Duration in blocks while the vote has been paused
+        DisputableStatus disputableStatus;      // Status of the disputable vote
+        uint256 actionId;                       // Identification number of the disputable action in the context of the agreement
     }
 
     MiniMeToken public token;
     uint64 public supportRequiredPct;
     uint64 public minAcceptQuorumPct;
     uint64 public durationBlocks;
-    uint64 public bufferBlocks;
+    uint64 public bufferBlocks;         // Blocks between each vote
     uint64 public executionDelayBlocks;
 
     // We are mimicing an array, we use a mapping instead to make app upgrade more graceful
@@ -71,6 +86,9 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
 
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
+    event PauseVote(uint256 indexed voteId);
+    event ResumeVote(uint256 indexed voteId);
+    event CancelVote(uint256 indexed voteId);
     event ExecuteVote(uint256 indexed voteId);
     event ChangeSupportRequired(uint64 supportRequiredPct);
     event ChangeMinQuorum(uint64 minAcceptQuorumPct);
@@ -172,7 +190,7 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
     */
     function newVote(bytes _executionScript, string _metadata, bool _castVote)
         external
-        auth(CREATE_VOTES_ROLE)
+        authP(CREATE_VOTES_ROLE, arr(msg.sender))
         returns (uint256 voteId)
     {
         return _newVote(_executionScript, _metadata, _castVote);
@@ -203,8 +221,19 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
 
         vote_.executed = true;
 
+        address[] memory blacklist;
         bytes memory input = new bytes(0); // TODO: Consider input for voting scripts
-        runScript(vote_.executionScript, input, new address[](0));
+
+        if (vote_.disputableStatus == DisputableStatus.Invalid) {
+            blacklist = new address[](0);
+        } else {
+            blacklist = new address[](1);
+            blacklist[0] = address(_getAgreement());
+            _closeAction(vote_.actionId);
+            vote_.disputableStatus = DisputableStatus.Closed;
+        }
+
+        runScript(vote_.executionScript, input, blacklist);
 
         emit ExecuteVote(_voteId);
     }
@@ -238,7 +267,7 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
     */
     function canForward(address _sender, bytes) public view returns (bool) {
         // Note that `canPerform()` implicitly does an initialization check itself
-        return canPerform(_sender, CREATE_VOTES_ROLE, arr());
+        return canPerform(_sender, CREATE_VOTES_ROLE, arr(_sender));
     }
 
     // ACL Oracle fns
@@ -337,6 +366,23 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
         script = vote_.executionScript;
     }
 
+    function getDisputableInfo(uint256 _voteId)
+    external
+    view
+    returns (
+        uint256 actionId,
+        uint64 pausedAtBlock,
+        uint64 pauseDurationBlocks,
+        DisputableStatus status
+    )
+    {
+        Vote storage vote_ = votes[_voteId];
+        actionId = vote_.actionId;
+        pausedAtBlock = vote_.pausedAtBlock;
+        pauseDurationBlocks = vote_.pauseDurationBlocks;
+        status = vote_.disputableStatus;
+    }
+
     /**
     * @dev Return the state of a voter for a given vote by its ID
     * @param _voteId Vote identifier
@@ -368,6 +414,8 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
         vote_.executionScript = _executionScript;
+        vote_.actionId = _newAction(voteId, msg.sender, bytes(_metadata));
+        vote_.disputableStatus = DisputableStatus.Active;
 
         emit StartVote(voteId, msg.sender, _metadata);
 
@@ -399,6 +447,53 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
     }
 
     /**
+    * @dev Challenge a vote
+    * @param _voteId Identification number of the vote to be challenged
+    */
+    function _onDisputableChallenged(uint256 _voteId, address /* _challenger */) internal {
+        Vote storage vote_ = votes[_voteId];
+        require(_canPause(vote_), ERROR_CANNOT_PAUSE_VOTE);
+
+        vote_.disputableStatus = DisputableStatus.Paused;
+        vote_.pausedAtBlock = getBlockNumber64();
+        emit PauseVote(_voteId);
+    }
+
+    /**
+    * @dev Allow a vote
+    * @param _voteId Identification number of the vote to be allowed
+    */
+    function _onDisputableAllowed(uint256 _voteId) internal {
+        Vote storage vote_ = votes[_voteId];
+        require(_isPaused(vote_), ERROR_VOTE_NOT_PAUSED);
+
+        vote_.disputableStatus = DisputableStatus.Active;
+        vote_.pauseDurationBlocks = getBlockNumber64().sub(vote_.pausedAtBlock);
+        emit ResumeVote(_voteId);
+    }
+
+    /**
+    * @dev Reject a vote
+    * @param _voteId Identification number of the vote to be rejected
+    */
+    function _onDisputableRejected(uint256 _voteId) internal {
+        Vote storage vote_ = votes[_voteId];
+        require(_isPaused(vote_), ERROR_VOTE_NOT_PAUSED);
+
+        vote_.disputableStatus = DisputableStatus.Cancelled;
+        vote_.pauseDurationBlocks = getBlockNumber64().sub(vote_.pausedAtBlock);
+        emit CancelVote(_voteId);
+    }
+
+    /**
+    * @dev Void an entry
+    * @param _voteId Identification number of the entry to be voided
+    */
+    function _onDisputableVoided(uint256 _voteId) internal {
+        _onDisputableRejected(_voteId);
+    }
+
+    /**
     * @dev Internal function to check if a vote can be executed. It assumes the queried vote exists.
     * @return True if the given vote can be executed, false otherwise
     */
@@ -409,8 +504,13 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
             return false;
         }
 
+        // If the vote is paused by agreements, it cannot be executed
+        if (_isPaused(vote_)) {
+            return false;
+        }
+
         // This will always be later than the end of the previous vote
-        if (getBlockNumber64() < vote_.executionBlock) {
+        if (getBlockNumber64() < _voteExecutionBlock(vote_)) {
             return false;
         }
 
@@ -427,8 +527,9 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
 
         bool hasSupportRequired = _isValuePct(vote_.yea, totalVotes, vote_.supportRequiredPct);
         bool hasMinQuorum = _isValuePct(vote_.yea, votingPowerAtSnapshot, vote_.minAcceptQuorumPct);
+        bool notCancelled = !_isCancelled(vote_);
 
-        return hasSupportRequired && hasMinQuorum;
+        return hasSupportRequired && hasMinQuorum && notCancelled;
     }
 
     /**
@@ -442,6 +543,33 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
         bool hasNotVoted = vote_.voters[_voter] == VoterState.Absent;
 
         return _isVoteOpen(vote_) && voterStake > 0 && hasNotVoted;
+    }
+
+    /**
+    * @dev Tell whether a vote can be paused or not
+    * @param vote_ Vote action instance being queried
+    * @return True if the given vote can be paused, false otherwise
+    */
+    function _canPause(Vote storage vote_) internal view returns (bool) {
+        return vote_.disputableStatus == DisputableStatus.Active && vote_.pausedAtBlock == 0;
+    }
+
+    /**
+    * @dev Tell whether a vote is paused or not
+    * @param vote_ Vote action instance being queried
+    * @return True if the given vote is paused, false otherwise
+    */
+    function _isPaused(Vote storage vote_) internal view returns (bool) {
+        return vote_.disputableStatus == DisputableStatus.Paused;
+    }
+
+    /**
+    * @dev Tell whether a vote is cancelled or not
+    * @param vote_ Vote action instance being queried
+    * @return True if the given vote is cancelled, false otherwise
+    */
+    function _isCancelled(Vote storage vote_) internal view returns (bool) {
+        return vote_.disputableStatus == DisputableStatus.Cancelled;
     }
 
     /**
@@ -460,9 +588,44 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
     * @return True if the given vote is open, false otherwise
     */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
+        if (_isPaused(vote_)) {
+            return false;
+        }
+
         uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
-        uint64 blockNumber = getBlockNumber64();
-        return votingPowerAtSnapshot > 0 && blockNumber >= vote_.startBlock && blockNumber < vote_.startBlock.add(durationBlocks);
+        return votingPowerAtSnapshot > 0 && getBlockNumber64() >= vote_.startBlock && getBlockNumber64() < _voteEndBlock(vote_);
+    }
+
+    /**
+    * @dev Internal function to calculate the end date of a vote. It assumes the queried vote exists.
+    */
+    function _voteEndBlock(Vote storage vote_) internal view returns (uint64) {
+        uint64 endBlock = vote_.startBlock.add(durationBlocks);
+        DisputableStatus status = vote_.disputableStatus;
+
+        if (status == DisputableStatus.Invalid) {
+            return endBlock;
+        }
+
+        if (status == DisputableStatus.Cancelled) {
+            return vote_.pausedAtBlock.add(vote_.pauseDurationBlocks);
+        }
+
+        return endBlock.add(vote_.pauseDurationBlocks);
+    }
+
+    /**
+    * @dev Internal function to calculate the end date of a vote. It assumes the queried vote exists.
+    */
+    function _voteExecutionBlock(Vote storage vote_) internal view returns (uint64) {
+        uint64 executionBlock = vote_.executionBlock;
+        DisputableStatus status = vote_.disputableStatus;
+
+        if (status == DisputableStatus.Invalid) {
+            return executionBlock;
+        }
+
+        return executionBlock.add(vote_.pauseDurationBlocks);
     }
 
     /**
@@ -491,14 +654,17 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp 
 
         uint256 senderLatestYeaVoteId = latestYeaVoteId[_sender];
         Vote storage senderLatestYeaVote_ = votes[senderLatestYeaVoteId];
-        uint64 blockNumber = getBlockNumber64();
+        uint256 voteExecutionBlock = _voteExecutionBlock(senderLatestYeaVote_);
 
         bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote_);
-        bool senderLatestYeaVoteExecutionBlockPassed = blockNumber >= senderLatestYeaVote_.executionBlock;
+        bool senderLatestYeaVoteNotPaused = !_isPaused(senderLatestYeaVote_);
+        bool senderLatestYeaVoteExecutionBlockPassed = getBlockNumber64() >= voteExecutionBlock;
 
         uint64 fallbackPeriodLength = bufferBlocks / EXECUTION_PERIOD_FALLBACK_DIVISOR;
-        bool senderLatestYeaVoteFallbackPeriodPassed = blockNumber > senderLatestYeaVote_.executionBlock.add(fallbackPeriodLength);
+        bool senderLatestYeaVoteFallbackPeriodPassed = getBlockNumber64() > voteExecutionBlock.add(fallbackPeriodLength);
 
-        return senderLatestYeaVoteFailed && senderLatestYeaVoteExecutionBlockPassed || senderLatestYeaVote_.executed || senderLatestYeaVoteFallbackPeriodPassed;
+        return senderLatestYeaVoteFailed && senderLatestYeaVoteNotPaused && senderLatestYeaVoteExecutionBlockPassed
+            || senderLatestYeaVote_.executed
+            || senderLatestYeaVoteFallbackPeriodPassed;
     }
 }
