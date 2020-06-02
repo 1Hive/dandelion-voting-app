@@ -34,7 +34,7 @@
     "@aragon/apps-token-manager": "^2.1.0",
     "@aragon/apps-vault": "^4.1.0",
     "@aragon/client": "^1.1.0",
-    "@aragon/os": "^4.2.0"
+    "@aragon/os": "aragon/aragonOS#add_disputable_base_app"
   },
   "devDependencies": {
     "@aragon/apps-shared-migrations": "1.0.0",
@@ -43,7 +43,8 @@
     "@aragon/apps-vault": "^4.1.0",
     "@aragon/apps-voting": "^2.1.0",
     "@aragon/apps-agreement": "0.1.0",
-    "@1hive/apps-token-manager": "2.1.0",
+    "@aragon/contract-test-helpers": "^0.0.1",
+    "@1hive/apps-token-manager": "2.2.0",
     "@aragon/cli": "^7.0.3",
     "@aragon/test-helpers": "^2.0.0",
     "@babel/core": "^7.4.4",

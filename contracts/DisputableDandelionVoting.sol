@@ -14,9 +14,9 @@ import "@aragon/os/contracts/lib/math/SafeMath64.sol";
 import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 import "@1hive/apps-token-manager/contracts/TokenManagerHook.sol";
 
-import "@aragon/apps-agreement/contracts/disputable/DisputableApp.sol";
+import "@aragon/os/contracts/apps/disputable/DisputableApp.sol";
 
-contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
+contract DisputableDandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
     using SafeMath for uint256;
     using SafeMath64 for uint64;
 
@@ -48,7 +48,6 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
     enum VoterState { Absent, Yea, Nay }
 
     enum DisputableStatus {
-        Invalid,                        // A vote created in a previous version that has not been reported to the Agreement
         Active,                         // A vote that has been reported to the Agreement
         Paused,                         // A vote that is being challenged
         Cancelled,                      // A vote that has been cancelled since it was refused after a dispute
@@ -220,19 +219,12 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
         Vote storage vote_ = votes[_voteId];
 
         vote_.executed = true;
+        vote_.disputableStatus = DisputableStatus.Closed;
+        _closeAgreementAction(vote_.actionId);
 
-        address[] memory blacklist;
         bytes memory input = new bytes(0); // TODO: Consider input for voting scripts
-
-        if (vote_.disputableStatus == DisputableStatus.Invalid) {
-            blacklist = new address[](0);
-        } else {
-            blacklist = new address[](1);
-            blacklist[0] = address(_getAgreement());
-            _closeAction(vote_.actionId);
-            vote_.disputableStatus = DisputableStatus.Closed;
-        }
-
+        address[] memory blacklist = new address[](1);
+        blacklist[0] = address(_getAgreement());
         runScript(vote_.executionScript, input, blacklist);
 
         emit ExecuteVote(_voteId);
@@ -414,7 +406,7 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
         vote_.executionScript = _executionScript;
-        vote_.actionId = _newAction(voteId, msg.sender, bytes(_metadata));
+        vote_.actionId = _newAgreementAction(voteId, msg.sender, bytes(_metadata));
         vote_.disputableStatus = DisputableStatus.Active;
 
         emit StartVote(voteId, msg.sender, _metadata);
@@ -450,7 +442,7 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
     * @dev Challenge a vote
     * @param _voteId Identification number of the vote to be challenged
     */
-    function _onDisputableChallenged(uint256 _voteId, address /* _challenger */) internal {
+    function _onDisputableActionChallenged(uint256 _voteId, uint256 /* _challengeId */, address /* _challenger */) internal {
         Vote storage vote_ = votes[_voteId];
         require(_canPause(vote_), ERROR_CANNOT_PAUSE_VOTE);
 
@@ -463,7 +455,7 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
     * @dev Allow a vote
     * @param _voteId Identification number of the vote to be allowed
     */
-    function _onDisputableAllowed(uint256 _voteId) internal {
+    function _onDisputableActionAllowed(uint256 _voteId) internal {
         Vote storage vote_ = votes[_voteId];
         require(_isPaused(vote_), ERROR_VOTE_NOT_PAUSED);
 
@@ -476,7 +468,7 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
     * @dev Reject a vote
     * @param _voteId Identification number of the vote to be rejected
     */
-    function _onDisputableRejected(uint256 _voteId) internal {
+    function _onDisputableActionRejected(uint256 _voteId) internal {
         Vote storage vote_ = votes[_voteId];
         require(_isPaused(vote_), ERROR_VOTE_NOT_PAUSED);
 
@@ -489,8 +481,8 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
     * @dev Void an entry
     * @param _voteId Identification number of the entry to be voided
     */
-    function _onDisputableVoided(uint256 _voteId) internal {
-        _onDisputableRejected(_voteId);
+    function _onDisputableActionVoided(uint256 _voteId) internal {
+        _onDisputableActionAllowed(_voteId);
     }
 
     /**
@@ -504,8 +496,8 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
             return false;
         }
 
-        // If the vote is paused by agreements, it cannot be executed
-        if (_isPaused(vote_)) {
+        // If the vote cannot proceed due to an Agreement dispute, it cannot be executed
+        if (!_canProceedAgreementAction(vote_.actionId)) {
             return false;
         }
 
@@ -588,44 +580,29 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
     * @return True if the given vote is open, false otherwise
     */
     function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
-        if (_isPaused(vote_)) {
-            return false;
-        }
-
         uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
-        return votingPowerAtSnapshot > 0 && getBlockNumber64() >= vote_.startBlock && getBlockNumber64() < _voteEndBlock(vote_);
+        return votingPowerAtSnapshot > 0
+            && _canProceedAgreementAction(vote_.actionId)
+            && getBlockNumber64() >= vote_.startBlock
+            && getBlockNumber64() < _voteEndBlock(vote_);
     }
 
     /**
-    * @dev Internal function to calculate the end date of a vote. It assumes the queried vote exists.
+    * @dev Internal function to calculate the end block of a vote. It assumes the queried vote exists
+           and the vote is not paused or cancelled by Agreements.
     */
     function _voteEndBlock(Vote storage vote_) internal view returns (uint64) {
         uint64 endBlock = vote_.startBlock.add(durationBlocks);
-        DisputableStatus status = vote_.disputableStatus;
-
-        if (status == DisputableStatus.Invalid) {
-            return endBlock;
-        }
-
-        if (status == DisputableStatus.Cancelled) {
-            return vote_.pausedAtBlock.add(vote_.pauseDurationBlocks);
-        }
-
-        return endBlock.add(vote_.pauseDurationBlocks);
+        uint64 endIncludingPause = endBlock.add(vote_.pauseDurationBlocks);
+        return endIncludingPause;
     }
 
     /**
-    * @dev Internal function to calculate the end date of a vote. It assumes the queried vote exists.
+    * @dev Internal function to calculate the execution block of a vote. It assumes the queried vote exists
+    *      and the vote is not paused or cancelled.
     */
     function _voteExecutionBlock(Vote storage vote_) internal view returns (uint64) {
-        uint64 executionBlock = vote_.executionBlock;
-        DisputableStatus status = vote_.disputableStatus;
-
-        if (status == DisputableStatus.Invalid) {
-            return executionBlock;
-        }
-
-        return executionBlock.add(vote_.pauseDurationBlocks);
+        return vote_.executionBlock.add(vote_.pauseDurationBlocks);
     }
 
     /**
@@ -641,11 +618,11 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
     }
 
     /**
-    * @notice Returns whether the sender has voted on the most recent open vote or closed unexecuted vote.
+    * @notice Returns whether the sender has voted on the most recent open vote or closed unexecuted/uncancelled vote.
     * @dev IACLOracle interface conformance. The ACLOracle permissioned function should specify the sender
     *      with 'authP(SOME_ACL_ROLE, arr(sender))', where sender is typically set to 'msg.sender'.
     * @param _sender Voter to check if they can vote
-    * return False if the sender has voted on the most recent open vote or closed unexecuted vote, true if they haven't.
+    * return False if the sender has voted on the most recent open vote or closed unexecuted/uncancelled vote, true if they haven't.
     */
     function _noRecentPositiveVotes(address _sender) internal returns (bool) {
         if (votesLength == 0) {
@@ -663,8 +640,8 @@ contract DandelionVoting is IACLOracle, TokenManagerHook, DisputableApp {
         uint64 fallbackPeriodLength = bufferBlocks / EXECUTION_PERIOD_FALLBACK_DIVISOR;
         bool senderLatestYeaVoteFallbackPeriodPassed = getBlockNumber64() > voteExecutionBlock.add(fallbackPeriodLength);
 
-        return senderLatestYeaVoteFailed && senderLatestYeaVoteNotPaused && senderLatestYeaVoteExecutionBlockPassed
-            || senderLatestYeaVote_.executed
-            || senderLatestYeaVoteFallbackPeriodPassed;
+        return senderLatestYeaVoteNotPaused && senderLatestYeaVoteFailed && senderLatestYeaVoteExecutionBlockPassed
+            || senderLatestYeaVoteNotPaused && senderLatestYeaVoteFallbackPeriodPassed
+            || senderLatestYeaVote_.executed;
     }
 }

@@ -6,11 +6,10 @@ const { encodeCallScript, EMPTY_SCRIPT } = require('@aragon/test-helpers/evmScri
 const { makeErrorMappingProxy } = require('@aragon/test-helpers/utils')
 const ExecutionTarget = artifacts.require('ExecutionTarget')
 
-const Voting = artifacts.require('VotingMock')
+const Voting = artifacts.require('DisputableDandelionVotingMock')
 
 const ACL = artifacts.require('ACL')
 const Kernel = artifacts.require('Kernel')
-const DAOFactory = artifacts.require('DAOFactory')
 const EVMScriptRegistryFactory = artifacts.require('EVMScriptRegistryFactory')
 const MiniMeToken = artifacts.require('MiniMeToken')
 
@@ -26,12 +25,22 @@ const VOTER_STATE = ['ABSENT', 'YEA', 'NAY'].reduce((state, key, index) => {
     return state;
 }, {})
 
+const deployer = require('@aragon/apps-agreement/test/helpers/utils/deployer')(web3, artifacts)
+
+const VOTE_STATUS = {
+    ACTIVE: 0,
+    PAUSED: 1,
+    CANCELLED: 2,
+    CLOSED: 3,
+}
+
 
 contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, nonHolder]) => {
-    let votingBase, daoFact, voting, token, executionTarget
+    let votingBase, voting, token, executionTarget, agreement, collateralToken
 
     let APP_MANAGER_ROLE
-    let CREATE_VOTES_ROLE, MODIFY_SUPPORT_ROLE, MODIFY_QUORUM_ROLE, MODIFY_BUFFER_BLOCKS_ROLE, MODIFY_EXECUTION_DELAY_ROLE
+    let CREATE_VOTES_ROLE, MODIFY_SUPPORT_ROLE, MODIFY_QUORUM_ROLE, MODIFY_BUFFER_BLOCKS_ROLE,
+        MODIFY_EXECUTION_DELAY_ROLE, SET_AGREEMENT_ROLE, CHALLENGE_ROLE
 
     // Error strings
     const errors = makeErrorMappingProxy({
@@ -63,11 +72,16 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
     const executionDelayBlocks = 200
 
     before(async () => {
-        const kernelBase = await Kernel.new(true) // petrify immediately
-        const aclBase = await ACL.new()
-        const regFact = await EVMScriptRegistryFactory.new()
-        daoFact = await DAOFactory.new(kernelBase.address, aclBase.address, regFact.address)
         votingBase = await Voting.new()
+
+        // Setup agreements
+        agreement = await deployer.deployAndInitializeWrapper({ root })
+        collateralToken = await deployer.deployCollateralToken()
+        await agreement.sign(holder1)
+        await agreement.sign(holder2)
+        await agreement.sign(holder20)
+        await agreement.sign(holder29)
+        await agreement.sign(holder51)
 
         // Setup constants
         APP_MANAGER_ROLE = await kernelBase.APP_MANAGER_ROLE()
@@ -76,26 +90,28 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         MODIFY_QUORUM_ROLE = await votingBase.MODIFY_QUORUM_ROLE()
         MODIFY_BUFFER_BLOCKS_ROLE = await votingBase.MODIFY_BUFFER_BLOCKS_ROLE()
         MODIFY_EXECUTION_DELAY_ROLE = await votingBase.MODIFY_EXECUTION_DELAY_ROLE()
+        SET_AGREEMENT_ROLE = await votingBase.SET_AGREEMENT_ROLE()
+        CHALLENGE_ROLE = await deployer.base.CHALLENGE_ROLE()
     })
 
     beforeEach(async () => {
-        const r = await daoFact.newDAO(root)
-        const dao = Kernel.at(getEventArgument(r, 'DeployDAO', 'dao'))
-        const acl = ACL.at(await dao.acl())
+        await deployer.acl.createPermission(root, deployer.dao.address, APP_MANAGER_ROLE, root, { from: root })
 
-        await acl.createPermission(root, dao.address, APP_MANAGER_ROLE, root, { from: root })
-
-        const receipt = await dao.newAppInstance('0x1234', votingBase.address, '0x', false, { from: root })
+        const receipt = await deployer.dao.newAppInstance('0x1234', votingBase.address, '0x', false, { from: root })
         voting = Voting.at(getNewProxyAddress(receipt))
 
-        await acl.createPermission(ANY_ADDR, voting.address, CREATE_VOTES_ROLE, root, { from: root })
-        await acl.createPermission(ANY_ADDR, voting.address, MODIFY_SUPPORT_ROLE, root, { from: root })
-        await acl.createPermission(ANY_ADDR, voting.address, MODIFY_QUORUM_ROLE, root, { from: root })
-        await acl.createPermission(ANY_ADDR, voting.address, MODIFY_BUFFER_BLOCKS_ROLE, root, { from: root })
-        await acl.createPermission(ANY_ADDR, voting.address, MODIFY_EXECUTION_DELAY_ROLE, root, { from: root })
+        await deployer.acl.createPermission(ANY_ADDR, voting.address, CREATE_VOTES_ROLE, root, { from: root })
+        await deployer.acl.createPermission(ANY_ADDR, voting.address, MODIFY_SUPPORT_ROLE, root, { from: root })
+        await deployer.acl.createPermission(ANY_ADDR, voting.address, MODIFY_QUORUM_ROLE, root, { from: root })
+        await deployer.acl.createPermission(ANY_ADDR, voting.address, MODIFY_BUFFER_BLOCKS_ROLE, root, { from: root })
+        await deployer.acl.createPermission(ANY_ADDR, voting.address, MODIFY_EXECUTION_DELAY_ROLE, root, { from: root })
+        await deployer.acl.createPermission(agreement.address, voting.address, SET_AGREEMENT_ROLE, root, { from: root })
+        await deployer.acl.createPermission(ANY_ADDR, voting.address, CHALLENGE_ROLE, root, { from: root })
+
+        await voting.mockSetTimestamp(await agreement.currentTimestamp())
     })
 
-    context('normal token supply, common tests', () => {
+    context.only('normal token supply, common tests', () => {
         const neededSupport = pct16(50)
         const minimumAcceptanceQuorum = pct16(20)
 
@@ -103,6 +119,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             token = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'n', 0, 'n', true) // empty parameters minime
 
             await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
+            await agreement.register({ disputable: voting, collateralToken, actionCollateral: 0, challengeCollateral: 0, challengeDuration: ONE_DAY, from: root })
 
             executionTarget = await ExecutionTarget.new()
         })
