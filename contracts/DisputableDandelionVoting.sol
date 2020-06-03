@@ -11,7 +11,7 @@ import "@aragon/os/contracts/acl/IACLOracle.sol";
 import "@aragon/os/contracts/lib/math/SafeMath.sol";
 import "@aragon/os/contracts/lib/math/SafeMath64.sol";
 
-import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
+import "@aragon/minime/contracts/MiniMeToken.sol";
 import "@1hive/apps-token-manager/contracts/TokenManagerHook.sol";
 
 import "@aragon/os/contracts/apps/disputable/DisputableApp.sol";
