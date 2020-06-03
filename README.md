@@ -7,7 +7,9 @@
 
 #### 🚨 Security review status: Not audited
 [Contracts audited](https://diligence.consensys.net/audits/2019/12/dandelion-organizations/) at a previous commit.
-Beware some changes have been made to the contract since this audit.
+Beware some changes have been made to the contract since this audit. Specifically the contract now implements the 
+[TokenManagerHook](https://github.com/1Hive/token-manager-app/blob/master/contracts/TokenManagerHook.sol) to enable the use
+of transferable tokens. The unaudited version is not deployed to Mainnet. 
 
 The Dandelion Voting app is a fork of the Original [Aragon Voting app](https://github.com/aragon/aragon-apps/tree/master/apps/voting).
 It serves the same purpose as the original Voting app but also enables organizations to restrict actions to members who have expressed approval in recent votes. It basically means that by voting yes on a proposal you are committing to a decision in the Org.
