@@ -180,9 +180,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
   })
 
-  // TODO: Revert
-  for (const decimals of [0]) {
-    // for (const decimals of [0, 2, 18, 26]) {
+  for (const decimals of [0, 2, 18, 26]) {
     context(`normal token supply, ${decimals} decimals`, () => {
       const neededSupport = pct16(50)
       const minimumAcceptanceQuorum = pct16(20)
@@ -241,7 +239,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
       })
 
       context('creating vote', () => {
-        let script, voteId, creator, metadata
+        let script, voteId, creator, metadata, actionId
 
         beforeEach(async () => {
           const action = {
@@ -254,6 +252,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
           voteId = getEventArgument(receipt, 'StartVote', 'voteId')
           creator = getEventArgument(receipt, 'StartVote', 'creator')
           metadata = getEventArgument(receipt, 'StartVote', 'metadata')
+          actionId = (await voting.getDisputableInfo(voteId))[0]
         })
 
         it('has correct state', async () => {
@@ -545,6 +544,24 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             assert.isTrue(await functionCallingNoRecentPositiveVotes(holder20))
           })
 
+          it('returns true when voted yea and vote finished, cancelled and execution delay passed', async () => {
+            await voting.vote(voteId, true, { from: holder29 })
+            await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
+            await agreement.challenge({ actionId })
+            await agreement.settle({ actionId })
+
+            assert.isTrue(await functionCallingNoRecentPositiveVotes(holder29))
+          })
+
+          it('returns false when voted yea and vote finished, failed and execution delay passed and is paused', async () => {
+            await voting.vote(voteId, true, { from: holder20 })
+            await voting.vote(voteId, false, { from: holder29 })
+            await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
+            await agreement.challenge({ actionId })
+
+            assert.isFalse(await functionCallingNoRecentPositiveVotes(holder20))
+          })
+
           it('returns false when voted yea and vote finished, failed and before execution delay passed', async () => {
             await voting.vote(voteId, true, { from: holder20 })
             await voting.vote(voteId, false, { from: holder29 })
@@ -573,6 +590,14 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks + executionPeriod)
 
             assert.isTrue(await functionCallingNoRecentPositiveVotes(holder29))
+          })
+
+          it('returns false when voted yea and vote not executed but execution period passed and is paused', async () => {
+            await voting.vote(voteId, true, { from: holder29 })
+            await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks + executionPeriod)
+            await agreement.challenge({ actionId })
+
+            assert.isFalse(await functionCallingNoRecentPositiveVotes(holder29))
           })
 
           it('returns false when voted yea and vote finished, not executed and before execution period passed', async () => {
@@ -640,7 +665,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             async (sender) => await voting.canPerform(ANY_ADDR, ANY_ADDR, '0x', [sender]))
         })
 
-        describe.only('TokenManagerHook _transfer()', () => {
+        describe('TokenManagerHook _transfer()', () => {
 
           itChecksNoRecentPositiveVotesCorrectly(
             async (sender) => await voting.onTransfer.call(sender, ANY_ADDR, bigExp(1, 18)))
