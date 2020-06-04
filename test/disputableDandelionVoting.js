@@ -6,30 +6,28 @@ const { encodeCallScript } = require('@aragon/contract-test-helpers/evmScript')
 const { makeErrorMappingProxy } = require('@aragon/contract-test-helpers/utils')
 
 const ExecutionTarget = artifacts.require('ExecutionTarget')
-
 const Voting = artifacts.require('DisputableDandelionVotingMock')
-
 const ACL = artifacts.require('ACL')
 const Kernel = artifacts.require('Kernel')
 const EVMScriptRegistryFactory = artifacts.require('EVMScriptRegistryFactory')
 const MiniMeToken = artifacts.require('MiniMeToken')
 
+const deployer = require('@aragon/apps-agreement/test/helpers/utils/deployer')(web3, artifacts)
+
 const toBn = (number) => web3.utils.toBN(number)
 const bigExp = (x, y) => toBn(x).mul(toBn(10).pow(toBn(y)))
-
 const pct16 = x => bigExp(x, 16)
 const createdVoteId = receipt => getEventArgument(receipt, 'StartVote', 'voteId')
 
 const ANY_ADDR = '0xffffffffffffffffffffffffffffffffffffffff'
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const EMPTY_SCRIPT = '0x00000001'
+const ONE_DAY = 60 * 60 * 24
 
 const VOTER_STATE = ['ABSENT', 'YEA', 'NAY'].reduce((state, key, index) => {
     state[key] = index;
     return state;
 }, {})
-
-const deployer = require('@aragon/apps-agreement/test/helpers/utils/deployer')(web3, artifacts)
 
 const VOTE_STATUS = {
     ACTIVE: 0,
@@ -38,11 +36,8 @@ const VOTE_STATUS = {
     CLOSED: 3,
 }
 
-
 contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, nonHolder]) => {
     let votingBase, voting, token, executionTarget, agreement, collateralToken
-
-    let APP_MANAGER_ROLE
     let CREATE_VOTES_ROLE, MODIFY_SUPPORT_ROLE, MODIFY_QUORUM_ROLE, MODIFY_BUFFER_BLOCKS_ROLE,
         MODIFY_EXECUTION_DELAY_ROLE, SET_AGREEMENT_ROLE, CHALLENGE_ROLE
 
@@ -81,6 +76,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         // Setup agreements
         agreement = await deployer.deployAndInitializeWrapper({ root })
         collateralToken = await deployer.deployCollateralToken()
+        await agreement.sign(root)
         await agreement.sign(holder1)
         await agreement.sign(holder2)
         await agreement.sign(holder20)
@@ -88,7 +84,6 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         await agreement.sign(holder51)
 
         // Setup constants
-        APP_MANAGER_ROLE = await kernelBase.APP_MANAGER_ROLE()
         CREATE_VOTES_ROLE = await votingBase.CREATE_VOTES_ROLE()
         MODIFY_SUPPORT_ROLE = await votingBase.MODIFY_SUPPORT_ROLE()
         MODIFY_QUORUM_ROLE = await votingBase.MODIFY_QUORUM_ROLE()
@@ -99,10 +94,8 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
     })
 
     beforeEach(async () => {
-        await deployer.acl.createPermission(root, deployer.dao.address, APP_MANAGER_ROLE, root, { from: root })
-
         const receipt = await deployer.dao.newAppInstance('0x1234', votingBase.address, '0x', false, { from: root })
-        voting = Voting.at(getNewProxyAddress(receipt))
+        voting = await Voting.at(getNewProxyAddress(receipt))
 
         await deployer.acl.createPermission(ANY_ADDR, voting.address, CREATE_VOTES_ROLE, root, { from: root })
         await deployer.acl.createPermission(ANY_ADDR, voting.address, MODIFY_SUPPORT_ROLE, root, { from: root })
@@ -115,7 +108,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         await voting.mockSetTimestamp(await agreement.currentTimestamp())
     })
 
-    context.only('normal token supply, common tests', () => {
+    context('normal token supply, common tests', () => {
         const neededSupport = pct16(50)
         const minimumAcceptanceQuorum = pct16(20)
 
@@ -200,6 +193,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
                 await token.generateTokens(holder51, bigExp(51, decimals))
 
                 await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
+                await agreement.register({ disputable: voting, collateralToken, actionCollateral: 0, challengeCollateral: 0, challengeDuration: ONE_DAY, from: root })
 
                 executionTarget = await ExecutionTarget.new()
             })
@@ -669,6 +663,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             token = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'n', 0, 'n', true) // empty parameters minime
 
             await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
+            await agreement.register({ disputable: voting, collateralToken, actionCollateral: 0, challengeCollateral: 0, challengeDuration: ONE_DAY, from: root })
         })
 
         it('prevents voting if token has no holder', async () => {
@@ -690,6 +685,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             await token.generateTokens(holder1, 1)
 
             await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
+            await agreement.register({ disputable: voting, collateralToken, actionCollateral: 0, challengeCollateral: 0, challengeDuration: ONE_DAY, from: root })
         })
 
         it('new vote cannot be executed after only possible voter has voted', async () => {
@@ -718,6 +714,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             await token.generateTokens(holder2, 2)
 
             await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
+            await agreement.register({ disputable: voting, collateralToken, actionCollateral: 0, challengeCollateral: 0, challengeDuration: ONE_DAY, from: root })
         })
 
         it('new vote cannot be executed before holder2 voting', async () => {
@@ -728,7 +725,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             await voting.vote(voteId, true, { from: holder1 })
             await voting.vote(voteId, true, { from: holder2 })
 
-          const { open, executed } = await voting.getVote(voteId)
+            const { open, executed } = await voting.getVote(voteId)
 
             assert.isTrue(open, 'vote should be open')
             assert.isFalse(executed, 'vote should not have been executed')
@@ -736,7 +733,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
         it('creating vote as holder2 does not execute vote', async () => {
             const voteId = createdVoteId(await voting.newVote(EMPTY_SCRIPT, 'metadata', true, { from: holder2 }))
-          const { open, executed } = await voting.getVote(voteId)
+            const { open, executed } = await voting.getVote(voteId)
 
             assert.isTrue(open, 'vote should be open')
             assert.isFalse(executed, 'vote should not have been executed')
@@ -754,6 +751,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             await token.generateTokens(holder2, 1)
 
             await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
+            await agreement.register({ disputable: voting, collateralToken, actionCollateral: 0, challengeCollateral: 0, challengeDuration: ONE_DAY, from: root })
         })
 
         it('uses the correct snapshot value if tokens are minted afterwards', async () => {

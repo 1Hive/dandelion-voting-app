@@ -5,6 +5,9 @@ import "@aragon/os/contracts/kernel/Kernel.sol";
 import "@aragon/os/contracts/factory/DAOFactory.sol";
 import "@aragon/os/contracts/factory/EVMScriptRegistryFactory.sol";
 
+import "@aragon/apps-agreement/contracts/staking/StakingFactory.sol";
+import "@aragon/apps-agreement/contracts/test/mocks/AgreementMock.sol";
+import "@aragon/apps-agreement/contracts/test/mocks/disputable/ArbitratorMock.sol";
 
 // You might think this file is a bit odd, but let me explain.
 // We only use some contracts in our tests, which means Truffle
