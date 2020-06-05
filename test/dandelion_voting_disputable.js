@@ -22,7 +22,7 @@ const VOTE_STATUS = {
   ACTIVE: 0,
   PAUSED: 1,
   CANCELLED: 2,
-  CLOSED: 3,
+  CLOSED: 3
 }
 
 contract('Voting disputable', ([_, owner, voter51, voter49]) => {
@@ -63,12 +63,22 @@ contract('Voting disputable', ([_, owner, voter51, voter49]) => {
 
     await voting.mockSetTimestamp(await agreement.currentTimestamp())
     await voting.initialize(token.address, MIN_SUPPORT, MIN_QUORUM, VOTING_DURATION_BLOCKS, BUFFER_BLOCKS, EXECUTION_DELAY_BLOCKS, { from: owner })
-    await agreement.register({ disputable: voting, collateralToken, actionCollateral: 0, challengeCollateral: 0, challengeDuration: 2 * ONE_DAY, from: owner })
+    await agreement.register({
+      disputable: voting,
+      collateralToken,
+      actionCollateral: 0,
+      challengeCollateral: 0,
+      challengeDuration: 2 * ONE_DAY,
+      from: owner
+    })
   })
 
   const createVote = async ({ voter, cast = false, execute = false }) => {
     executionTarget = await ExecutionTarget.new()
-    script = encodeCallScript([{ to: executionTarget.address, calldata: executionTarget.contract.methods.execute().encodeABI() }])
+    script = encodeCallScript([{
+      to: executionTarget.address,
+      calldata: executionTarget.contract.methods.execute().encodeABI()
+    }])
 
     const receipt = await voting.newVote(script, 'metadata', cast, { from: voter })
     const logs = decodeEventsOfType(receipt, Voting.abi, 'StartVote')

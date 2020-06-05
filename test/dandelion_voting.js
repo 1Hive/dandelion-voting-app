@@ -1,15 +1,12 @@
 const { assertRevert } = require('@aragon/contract-test-helpers/assertThrow')
 const { assertAmountOfEvents } = require('@aragon/contract-test-helpers/assertEvent')
-const { getEventAt, getEventArgument, getNewProxyAddress } = require('@aragon/contract-test-helpers/events')
+const { getEventArgument, getNewProxyAddress } = require('@aragon/contract-test-helpers/events')
 const getBlockNumber = require('@aragon/contract-test-helpers/blockNumber')(web3)
 const { encodeCallScript } = require('@aragon/contract-test-helpers/evmScript')
 const { makeErrorMappingProxy } = require('@aragon/contract-test-helpers/utils')
 
 const ExecutionTarget = artifacts.require('ExecutionTarget')
 const Voting = artifacts.require('DisputableDandelionVotingMock')
-const ACL = artifacts.require('ACL')
-const Kernel = artifacts.require('Kernel')
-const EVMScriptRegistryFactory = artifacts.require('EVMScriptRegistryFactory')
 const MiniMeToken = artifacts.require('MiniMeToken')
 
 const deployer = require('@aragon/apps-agreement/test/helpers/utils/deployer')(web3, artifacts)
