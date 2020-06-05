@@ -114,8 +114,6 @@ npm run start:template
 ## Aragon DAO Installation
 The Dandelion voting app has been published to APM on Mainnet and Rinkeby at `dandelion-voting.aragonpm.eth`
 
-For a detailed step by step guide you can see [our installation guide](./docs/installation-guide.md)
-
 To deploy to an organization you can use the [aragonCLI](https://hack.aragon.org/docs/cli-intro.html).
 
 ```sh
