@@ -11,10 +11,11 @@ import "@aragon/os/contracts/acl/IACLOracle.sol";
 import "@aragon/os/contracts/lib/math/SafeMath.sol";
 import "@aragon/os/contracts/lib/math/SafeMath64.sol";
 
-import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
+import "@aragon/minime/contracts/MiniMeToken.sol";
+import "@1hive/apps-token-manager/contracts/TokenManagerHook.sol";
 
 
-contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
+contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp {
     using SafeMath for uint256;
     using SafeMath64 for uint64;
 
@@ -243,33 +244,28 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
     // ACL Oracle fns
 
     /**
-    * @notice Returns whether the sender has voted on the most recent open vote or closed unexecuted vote.
     * @dev IACLOracle interface conformance. The ACLOracle permissioned function should specify the sender
     *      with 'authP(SOME_ACL_ROLE, arr(sender))', where sender is typically set to 'msg.sender'.
     * @param _how Array passed by Kernel when using 'authP()'. First item should be the address to check can perform.
     * return False if the sender has voted on the most recent open vote or closed unexecuted vote, true if they haven't.
     */
     function canPerform(address, address, bytes32, uint256[] _how) external view returns (bool) {
-        if (votesLength == 0) {
-            return true;
-        }
-
         require(_how.length > 0, ERROR_ORACLE_SENDER_MISSING);
         require(_how[0] < 2**160, ERROR_ORACLE_SENDER_TOO_BIG);
         require(_how[0] != 0, ERROR_ORACLE_SENDER_ZERO);
 
-        address sender = address(_how[0]);
-        uint256 senderLatestYeaVoteId = latestYeaVoteId[sender];
-        Vote storage senderLatestYeaVote_ = votes[senderLatestYeaVoteId];
-        uint64 blockNumber = getBlockNumber64();
+        return _noRecentPositiveVotes(address(_how[0]));
+    }
 
-        bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote_);
-        bool senderLatestYeaVoteExecutionBlockPassed = blockNumber >= senderLatestYeaVote_.executionBlock;
+    // Token Manager Hook fns
 
-        uint64 fallbackPeriodLength = bufferBlocks / EXECUTION_PERIOD_FALLBACK_DIVISOR;
-        bool senderLatestYeaVoteFallbackPeriodPassed = blockNumber > senderLatestYeaVote_.executionBlock.add(fallbackPeriodLength);
-
-        return senderLatestYeaVoteFailed && senderLatestYeaVoteExecutionBlockPassed || senderLatestYeaVote_.executed || senderLatestYeaVoteFallbackPeriodPassed;
+    /**
+    * @dev TokenManagerHook interface conformance.
+    * @param _from The address from which funds will be transferred
+    * return False if `_from` has voted on the most recent open vote or closed unexecuted vote, true if they haven't.
+    */
+    function _onTransfer(address _from, address _to, uint256 _amount) internal returns (bool) {
+        return _noRecentPositiveVotes(_from);
     }
 
     // Getter fns
@@ -479,5 +475,30 @@ contract DandelionVoting is IForwarder, IACLOracle, AragonApp {
 
         uint256 computedPct = _value.mul(PCT_BASE) / _total;
         return computedPct > _pct;
+    }
+
+    /**
+    * @notice Returns whether the sender has voted on the most recent open vote or closed unexecuted vote.
+    * @dev IACLOracle interface conformance. The ACLOracle permissioned function should specify the sender
+    *      with 'authP(SOME_ACL_ROLE, arr(sender))', where sender is typically set to 'msg.sender'.
+    * @param _sender Voter to check if they can vote
+    * return False if the sender has voted on the most recent open vote or closed unexecuted vote, true if they haven't.
+    */
+    function _noRecentPositiveVotes(address _sender) internal returns (bool) {
+        if (votesLength == 0) {
+            return true;
+        }
+
+        uint256 senderLatestYeaVoteId = latestYeaVoteId[_sender];
+        Vote storage senderLatestYeaVote_ = votes[senderLatestYeaVoteId];
+        uint64 blockNumber = getBlockNumber64();
+
+        bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote_);
+        bool senderLatestYeaVoteExecutionBlockPassed = blockNumber >= senderLatestYeaVote_.executionBlock;
+
+        uint64 fallbackPeriodLength = bufferBlocks / EXECUTION_PERIOD_FALLBACK_DIVISOR;
+        bool senderLatestYeaVoteFallbackPeriodPassed = blockNumber > senderLatestYeaVote_.executionBlock.add(fallbackPeriodLength);
+
+        return senderLatestYeaVoteFailed && senderLatestYeaVoteExecutionBlockPassed || senderLatestYeaVote_.executed || senderLatestYeaVoteFallbackPeriodPassed;
     }
 }
