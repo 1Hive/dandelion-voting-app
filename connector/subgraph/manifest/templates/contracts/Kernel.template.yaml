@@ -22,8 +22,8 @@
     entities:
       - NoEnt
     abis:
-      - name: ConvictionVoting
-        file: ./abis/ConvictionVoting.json
+      - name: DandelionVoting
+        file: ./abis/DandelionVoting.json
       - name: DAOFactory
         file: ./abis/DAOFactory.json
       - name: DAOKit
