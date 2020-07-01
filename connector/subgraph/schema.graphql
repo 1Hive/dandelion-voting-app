@@ -1,7 +1,5 @@
 type Vote @entity {
   id: ID!
-  orgAddress: Bytes!
-  appAddress: Bytes!
   creator: Bytes!
   metadata: String!
   executed: Boolean!
@@ -16,6 +14,8 @@ type Vote @entity {
   script: Bytes!
   voteNum: BigInt!
   casts: [Cast!]!
+  orgAddress: Bytes!
+  appAddress: Bytes!
 }
 
 type Cast @entity {
