@@ -12,11 +12,11 @@ dataSources:
   # DAOFactory
   - kind: ethereum/contract
     name: DAOFactory@0.8.1
-    network: rinkeby
+    network: mainnet
     source:
       abi: DAOFactory
-      address: '0x89d87269527495ac29648376d4154ba55c4872fc'
-      startBlock: 5922866
+      address: '0x7378ad1ba8f3c8e64bbb2a04473edd35846360f1'
+      startBlock: 9428558
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.4
@@ -45,11 +45,11 @@ dataSources:
   # DAOTemplate
   - kind: ethereum/contract
     name: dandelion-org-template.aragonpm.eth@1.0.0
-    network: rinkeby
+    network: mainnet
     source:
       abi: DAOTemplate
-      address: '0x09380aeaf234052bb8bde6dceffc45d8fde8f98d'
-      startBlock: 5925084
+      address: '0xbc2A863ef2B96d454aC7790D5A9E8cFfd8EccBa8'
+      startBlock: 9438534
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.4
@@ -90,7 +90,7 @@ templates:
   # Kernel
   - kind: ethereum/contract
     name: Kernel
-    network: rinkeby
+    network: mainnet
     source:
       abi: Kernel
     mapping:
@@ -121,7 +121,7 @@ templates:
   # MiniMeToken
   - kind: ethereum/contract
     name: MiniMeToken
-    network: rinkeby
+    network: mainnet
     source:
       abi: MiniMeToken
     mapping:
@@ -156,7 +156,7 @@ templates:
 
   - kind: ethereum/contract
     name: DandelionVoting
-    network: rinkeby
+    network: mainnet
     source:
       abi: DandelionVoting
     mapping:
