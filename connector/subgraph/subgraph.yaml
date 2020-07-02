@@ -1,0 +1,179 @@
+# Do not edit subgraph.yaml, this is a generated file.
+# Instead, edit subgraph.template.yaml and run `yarn manifest-<network>-[staging]`
+specVersion: 0.0.2
+description: A template for Aragon subgraphs
+repository: https://github.com/aragon/connect
+schema:
+  file: ./schema.graphql
+dataSources:
+# Organizations
+# /Organizations
+# Organization factories
+  # DAOFactory
+  - kind: ethereum/contract
+    name: DAOFactory@0.8.1
+    network: mainnet
+    source:
+      abi: DAOFactory
+      address: '0x7378ad1ba8f3c8e64bbb2a04473edd35846360f1'
+      startBlock: 9428558
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.4
+      language: wasm/assemblyscript
+      entities:
+        - NoEnt
+      abis:
+        - name: DAOFactory
+          file: ./abis/DAOFactory.json
+        - name: DAOKit
+          file: ./abis/DAOKit.json
+        - name: DAOTemplate
+          file: ./abis/DAOTemplate.json
+        - name: Kernel
+          file: ./abis/Kernel.json
+        - name: MiniMeToken
+          file: ./abis/MiniMeToken.json
+        - name: MiniMeTokenFactory
+          file: ./abis/MiniMeTokenFactory.json
+      eventHandlers:
+        - event: DeployDAO(address)
+          handler: handleDeployDAO
+      file: ./src/aragon/mappings/DAOFactory.ts
+# /Organization factories
+# Organization templates
+  # DAOTemplate
+  - kind: ethereum/contract
+    name: dandelion-org-template.aragonpm.eth@1.0.0
+    network: mainnet
+    source:
+      abi: DAOTemplate
+      address: '0xbc2A863ef2B96d454aC7790D5A9E8cFfd8EccBa8'
+      startBlock: 9438534
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.4
+      language: wasm/assemblyscript
+      entities:
+        - NoEnt
+      abis:
+        - name: DAOFactory
+          file: ./abis/DAOFactory.json
+        - name: DAOKit
+          file: ./abis/DAOKit.json
+        - name: DAOTemplate
+          file: ./abis/DAOTemplate.json
+        - name: Kernel
+          file: ./abis/Kernel.json
+        - name: MiniMeToken
+          file: ./abis/MiniMeToken.json
+        - name: MiniMeTokenFactory
+          file: ./abis/MiniMeTokenFactory.json
+      eventHandlers:
+        - event: DeployDao(address)
+          handler: handleDeployDao
+        - event: SetupDao(address)
+          handler: handleSetupDao
+        - event: DeployToken(address)
+          handler: handleDeployToken
+        - event: InstalledApp(address,bytes32)
+          handler: handleInstalledApp
+      file: ./src/aragon/mappings/DAOTemplate.ts
+# /Organization templates
+# Legacy organization templates
+# /Legacy organization templates
+# Token factories
+# /Token factories
+# Tokens
+# /Tokens
+templates:
+  # Kernel
+  - kind: ethereum/contract
+    name: Kernel
+    network: mainnet
+    source:
+      abi: Kernel
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.4
+      language: wasm/assemblyscript
+      entities:
+        - NoEnt
+      abis:
+        - name: DandelionVoting
+          file: ./abis/DandelionVoting.json
+        - name: DAOFactory
+          file: ./abis/DAOFactory.json
+        - name: DAOKit
+          file: ./abis/DAOKit.json
+        - name: DAOTemplate
+          file: ./abis/DAOTemplate.json
+        - name: Kernel
+          file: ./abis/Kernel.json
+        - name: MiniMeToken
+          file: ./abis/MiniMeToken.json
+        - name: MiniMeTokenFactory
+          file: ./abis/MiniMeTokenFactory.json
+      eventHandlers:
+        - event: NewAppProxy(address,bool,bytes32)
+          handler: handleNewAppProxy
+      file: ./src/aragon/mappings/Kernel.ts
+  # MiniMeToken
+  - kind: ethereum/contract
+    name: MiniMeToken
+    network: mainnet
+    source:
+      abi: MiniMeToken
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.4
+      language: wasm/assemblyscript
+      entities:
+        - NoEnt
+      abis:
+        - name: DAOFactory
+          file: ./abis/DAOFactory.json
+        - name: DAOKit
+          file: ./abis/DAOKit.json
+        - name: DAOTemplate
+          file: ./abis/DAOTemplate.json
+        - name: Kernel
+          file: ./abis/Kernel.json
+        - name: MiniMeToken
+          file: ./abis/MiniMeToken.json
+        - name: MiniMeTokenFactory
+          file: ./abis/MiniMeTokenFactory.json
+      eventHandlers:
+        - event: ClaimedTokens(indexed address,indexed address,uint256)
+          handler: handleClaimedTokens
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
+        - event: NewCloneToken(indexed address,uint256)
+          handler: handleNewCloneToken
+        - event: Approval(indexed address,indexed address,uint256)
+          handler: handleApproval
+      file: ./src/aragon/mappings/MiniMeToken.ts
+
+  - kind: ethereum/contract
+    name: DandelionVoting
+    network: mainnet
+    source:
+      abi: DandelionVoting
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.4
+      language: wasm/assemblyscript
+      entities:
+        - Vote
+        - Cast
+      abis:
+        - name: DandelionVoting
+          file: ./abis/DandelionVoting.json
+      eventHandlers:
+        - event: StartVote(indexed uint256,indexed address,string)
+          handler: handleStartVote
+        - event: CastVote(indexed uint256,indexed address,bool,uint256)
+          handler: handleCastVote
+        - event: ExecuteVote(indexed uint256)
+          handler: handleExecuteVote
+      file: ./src/DandelionVoting.ts
