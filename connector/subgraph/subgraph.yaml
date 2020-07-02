@@ -7,14 +7,16 @@ schema:
   file: ./schema.graphql
 dataSources:
 # Organizations
-  # Kernel
+# /Organizations
+# Organization factories
+  # DAOFactory
   - kind: ethereum/contract
-    name: votingsubgraph
+    name: DAOFactory@0.8.1
     network: rinkeby
     source:
-      abi: Kernel
-      address: '0x439A61aDdd3916eCBe055Afa4D380050F58a3590'
-      startBlock: 6769703
+      abi: DAOFactory
+      address: '0x89d87269527495ac29648376d4154ba55c4872fc'
+      startBlock: 5922866
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.4
@@ -22,8 +24,6 @@ dataSources:
       entities:
         - NoEnt
       abis:
-        - name: DandelionVoting
-          file: ./abis/DandelionVoting.json
         - name: DAOFactory
           file: ./abis/DAOFactory.json
         - name: DAOKit
@@ -37,13 +37,48 @@ dataSources:
         - name: MiniMeTokenFactory
           file: ./abis/MiniMeTokenFactory.json
       eventHandlers:
-        - event: NewAppProxy(address,bool,bytes32)
-          handler: handleNewAppProxy
-      file: ./src/aragon/mappings/Kernel.ts
-# /Organizations
-# Organization factories
+        - event: DeployDAO(address)
+          handler: handleDeployDAO
+      file: ./src/aragon/mappings/DAOFactory.ts
 # /Organization factories
 # Organization templates
+  # DAOTemplate
+  - kind: ethereum/contract
+    name: dandelion-org-template.aragonpm.eth@1.0.0
+    network: rinkeby
+    source:
+      abi: DAOTemplate
+      address: '0x09380aeaf234052bb8bde6dceffc45d8fde8f98d'
+      startBlock: 5925084
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.4
+      language: wasm/assemblyscript
+      entities:
+        - NoEnt
+      abis:
+        - name: DAOFactory
+          file: ./abis/DAOFactory.json
+        - name: DAOKit
+          file: ./abis/DAOKit.json
+        - name: DAOTemplate
+          file: ./abis/DAOTemplate.json
+        - name: Kernel
+          file: ./abis/Kernel.json
+        - name: MiniMeToken
+          file: ./abis/MiniMeToken.json
+        - name: MiniMeTokenFactory
+          file: ./abis/MiniMeTokenFactory.json
+      eventHandlers:
+        - event: DeployDao(address)
+          handler: handleDeployDao
+        - event: SetupDao(address)
+          handler: handleSetupDao
+        - event: DeployToken(address)
+          handler: handleDeployToken
+        - event: InstalledApp(address,bytes32)
+          handler: handleInstalledApp
+      file: ./src/aragon/mappings/DAOTemplate.ts
 # /Organization templates
 # Legacy organization templates
 # /Legacy organization templates
