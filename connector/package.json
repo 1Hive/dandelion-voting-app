@@ -28,7 +28,7 @@
     "@aragon/connect-thegraph": "^0.2.0",
     "graphql-tag": "^2.10.3"
   },
-  "description": "Access organizations and interact with Convcition Voting apps.",
+  "description": "Access organizations and interact with Dandelion Voting apps.",
   "keywords": [
     "ethereum",
     "javascript",
