@@ -3,6 +3,7 @@ import VotingConnectorTheGraph from "../connector";
 
 export interface CastData {
   id: string
+  voteNum: string
   voteId: string
   voter: string
   supports: boolean
@@ -12,6 +13,7 @@ export interface CastData {
 export default class Cast extends DandelionVotingEntity implements CastData {
   readonly id!: string
   readonly voteId!: string
+  readonly voteNum!: string
   readonly voter!: string
   readonly supports!: boolean
   readonly voterStake!: string

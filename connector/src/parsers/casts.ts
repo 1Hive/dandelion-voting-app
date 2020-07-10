@@ -16,6 +16,7 @@ export function parseCasts(
       return {
         id: cast.id,
         voteId: cast.voteId,
+        voteNum: cast.voteNum,
         voter: cast.voter,
         supports: cast.supports,
         voterStake: cast.voterStake

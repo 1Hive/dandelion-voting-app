@@ -31,6 +31,7 @@ export const CASTS_FOR_VOTE = (type: string) => gql`
     }, first: $first, skip: $skip) {
       id
       voteId
+      voteNum
       voter
       supports
       voterStake
