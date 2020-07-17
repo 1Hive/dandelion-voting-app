@@ -13,7 +13,8 @@
     "deploy-mainnet-staging": "env STAGING=true scripts/deploy.sh 1hive dandelion-voting mainnet",
     "deploy-rinkeby": "scripts/deploy.sh 1hive dandelion-voting rinkeby",
     "deploy-rinkeby-staging": "STAGING=true scripts/deploy.sh 1hive dv rinkeby",
-    "deploy-xdai": "scripts/deploy.sh 1hive dandelion-voting xdai"
+    "deploy-xdai": "scripts/deploy.sh 1hive dandelion-voting xdai",
+    "deploy-xdai-staging": "STAGING=true scripts/deploy.sh 1hive dandelion-voting xdai"
   },
   "devDependencies": {
     "@graphprotocol/graph-cli": "^0.18.0",

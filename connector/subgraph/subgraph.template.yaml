@@ -2,7 +2,7 @@
 # Instead, edit subgraph.template.yaml and run `yarn manifest-<network>-[staging]`
 specVersion: 0.0.2
 description: A template for Aragon subgraphs
-repository: https://github.com/aragon/connect
+repository: https://github.com/1Hive/dandelion-voting-app
 schema:
   file: ./schema.graphql
 dataSources:
