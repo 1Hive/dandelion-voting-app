@@ -12,11 +12,13 @@ const NETWORK_TIMES = new Map([
   ['ropsten', 11],
   ['goerli', 15],
   ['private', 3],
+  ['xdai', 5],
 ])
+
 export function useBlockTime() {
   const network = useNetwork()
 
-  return useMemo(() => (network ? NETWORK_TIMES.get(network.type) : null), [
+  return useMemo(() => (network ? NETWORK_TIMES.get(network.type) : 5), [
     network,
   ])
 }
