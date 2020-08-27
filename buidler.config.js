@@ -18,6 +18,9 @@ module.exports = {
     coverage: {
       url: 'http://localhost:8555',
     },
+    xdai: {
+      url: 'https://xdai.poanetwork.dev/'
+    }
   },
   solc: {
     version: '0.4.24',

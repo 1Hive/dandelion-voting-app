@@ -20,7 +20,7 @@
     "ropsten": {
       "registry": "0x6afe2cacee211ea9179992f89dc61ff25c61e923",
       "network": "ropsten",
-      "appName": "dandelion-voting.aragonpm.eth",
+      "appName": "dandelion-voting.aragonpm.eth"
     },
     "mainnet": {
       "registry": "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
